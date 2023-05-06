@@ -22,7 +22,7 @@ var (
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			arpScanner.Timeout = time.Second * time.Duration(timeout)
+			arpScanner.Timeout = time.Millisecond * time.Duration(timeout)
 			hosts, _ := cmd.Flags().GetStringArray("host")
 			logger.Debug("runE", zap.Any("host", hosts))
 			if len(hosts) == 0 {

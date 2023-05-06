@@ -5,6 +5,7 @@ import (
 	"gscan/arp"
 	"gscan/common"
 	"gscan/port"
+	"net"
 	"net/netip"
 	"time"
 
@@ -30,8 +31,12 @@ var (
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			tcpScanner.Timeout = time.Second * time.Duration(timeout)
-			arpScanner.Timeout = time.Second * time.Duration(timeout)
+			tcpScanner.Timeout = time.Millisecond * time.Duration(timeout)
+			if timeout > 2000 {
+				arpScanner.Timeout = 2000 * time.Microsecond
+			} else {
+				arpScanner.Timeout = time.Millisecond * time.Duration(timeout)
+			}
 			hosts, _ := cmd.Flags().GetStringArray("host")
 			logger.Debug("runE", zap.Any("host", hosts))
 			if len(hosts) == 0 {
@@ -99,14 +104,18 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 		case result := <-resultCh:
 			fmt.Printf("%-39s\t", result.IP)
 			if withARP {
-				if h, ok := arp.GetARPScanner().AHMap.Get(result.IP); ok {
+				vendor := ""
+				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
+				if ok {
 					prefix1, prefix2 := common.GetOuiPrefix(h)
-					vendor := arp.GetARPScanner().OMap[prefix2]
+					vendor = arp.GetARPScanner().OMap[prefix2]
 					if len(vendor) == 0 {
 						vendor = arp.GetARPScanner().OMap[prefix1]
 					}
-					fmt.Printf("%-17v\t%-40s\t", h, vendor)
+				} else {
+					h = net.HardwareAddr{}
 				}
+				fmt.Printf("%-17v\t%-40s\t", h, vendor)
 			}
 			fmt.Printf("%-20v\t%-4s\t%-5s\n", result.Port, "tcp", "open")
 		case <-timeoutCh:
