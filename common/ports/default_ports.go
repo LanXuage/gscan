@@ -3,14 +3,5 @@ package ports
 import "github.com/google/gopacket/layers"
 
 func GetDefaultPorts() *[]layers.TCPPort {
-	return &[]layers.TCPPort{
-		DEFAULT_DB2,
-		DEFAULT_ELASTICSEARCH,
-		DEFAULT_FTP,
-		DEFAULT_MONGODB,
-		DEFAULT_MYSQL,
-		DEFAULT_HTTP,
-		DEFAULT_HTTPS,
-		DEFAULT_SSH,
-	}
+	return &[]layers.TCPPort{20, 21, 22, 23, 25, 53, 80, 110, 135, 137, 138, 139, 161, 443, 445, 901, 991, 1025, 1026, 1029, 1080, 1099, 1433, 1521, 1526, 1723, 1863, 1900, 2179, 2483, 2484, 3306, 3389, 5040, 5091, 5357, 5800, 5900, 6379, 7680, 8000, 8008, 8009, 8080, 8090, 8443, 8888, 9000, 9001, 10808, 10809, 27017}
 }

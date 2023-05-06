@@ -23,11 +23,11 @@ var (
 			arpScanner := arp.GetARPScanner()
 			defer arpScanner.Close()
 			start := time.Now()
-			fmt.Printf("%-39s\t", "IP")
+			fmt.Printf("%-39s ", "IP")
 			if withARP {
-				fmt.Printf("%-17s\t%-40s\t", "MAC", "VENDOR")
+				fmt.Printf("%-17s %-40s ", "MAC", "VENDOR")
 			}
-			fmt.Printf("%-20s\t%-5s\n", "PORT", "STATE")
+			fmt.Printf("%-24s %-5s\n", "PORT", "STATE")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
@@ -102,7 +102,7 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 	for {
 		select {
 		case result := <-resultCh:
-			fmt.Printf("%-39s\t", result.IP)
+			fmt.Printf("%-39s ", result.IP)
 			if withARP {
 				vendor := ""
 				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
@@ -115,9 +115,9 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 				} else {
 					h = net.HardwareAddr{}
 				}
-				fmt.Printf("%-17v\t%-40s\t", h, vendor)
+				fmt.Printf("%-17v %-40s ", h, vendor)
 			}
-			fmt.Printf("%s/%-20v\t%-5s\n", "tcp", result.Port, "open")
+			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, "open")
 		case <-timeoutCh:
 			return
 		}
