@@ -9,7 +9,7 @@
 - [x] ~~ARP scan~~
 - [ ] ICMP scan
 - [x] ~~TCP port scan~~
-- [ ] Domain support
+- [x] ~~Domain support~~
 - [ ] Random port support
 - [ ] UDP port scan
 - [ ] Service discovery
@@ -68,7 +68,7 @@ Use "gscan [command] --help" for more information about a command.
 $ gscan arp -a
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
 192.168.48.1    00:15:5d:ab:10:3a       Microsoft Corporation
-Cost: 3.016305977s
+Cost: 6.514218807s
 ```
 
 #### 对指定 IP 进行 arp 扫描
@@ -76,7 +76,7 @@ Cost: 3.016305977s
 ```sh
 $ gscan arp -h 192.168.50.179
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
-Cost: 3.001094879s
+Cost: 6.500702247s
 ```
 
 > 注意：默认超时为6500毫秒，可以使用`-T`进行指定，单位为毫秒。
