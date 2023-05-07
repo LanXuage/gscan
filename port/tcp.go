@@ -2,7 +2,6 @@ package port
 
 import (
 	"gscan/common"
-	"gscan/common/ports"
 	"math/rand"
 	"net/netip"
 	"time"
@@ -23,10 +22,6 @@ type TCPScanner struct {
 	UseFullTCP   bool
 	PortScanType int8
 	Ports        []layers.TCPPort
-}
-
-func (t *TCPScanner) Save(sip []byte, sport layers.TCPPort) {
-
 }
 
 func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
@@ -209,7 +204,7 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 	if ip == iface.IP {
 		dstMac = iface.HWAddr
 	}
-	dstPorts := ports.GetDefaultPorts()
+	dstPorts := common.GetDefaultPorts()
 	if t.PortScanType == ALL_PORTS {
 		dstPorts = &[]layers.TCPPort{}
 		for i := 1; i < 65536; i++ {
