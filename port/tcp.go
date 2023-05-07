@@ -72,15 +72,11 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 		}
 	}
 	srcIP, _ := netip.AddrFromSlice(ip.SrcIP)
-	if _, ok := t.OpenPorts.Get(srcIP); !ok {
-		portSet := cmap.NewWithCustomShardingFunction[layers.TCPPort, bool](func(key layers.TCPPort) uint32 { return uint32(key) })
-		t.OpenPorts.Set(srcIP, portSet)
-	}
+	t.OpenPorts.SetIfAbsent(srcIP, cmap.NewWithCustomShardingFunction[layers.TCPPort, bool](func(key layers.TCPPort) uint32 { return uint32(key) }))
 	if res, ok := t.OpenPorts.Get(srcIP); ok {
-		if _, ok := res.Get(tcp.SrcPort); ok {
+		if !res.SetIfAbsent(tcp.SrcPort, true) {
 			return nil
 		}
-		res.Set(tcp.SrcPort, true)
 	}
 	return &TCPResult{
 		IP:   srcIP,

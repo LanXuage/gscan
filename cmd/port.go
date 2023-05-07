@@ -25,7 +25,7 @@ var (
 			start := time.Now()
 			fmt.Printf("%-39s ", "IP")
 			if withARP {
-				fmt.Printf("%-17s %-40s ", "MAC", "VENDOR")
+				fmt.Printf("%-17s %-73s ", "MAC", "VENDOR")
 			}
 			fmt.Printf("%-24s %-5s\n", "PORT", "STATE")
 			logger := common.GetLogger()
@@ -115,7 +115,7 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 				} else {
 					h = net.HardwareAddr{}
 				}
-				fmt.Printf("%-17v %-40s ", h, vendor)
+				fmt.Printf("%-17v %-73s ", h, vendor)
 			}
 			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, "open")
 		case <-timeoutCh:

@@ -19,6 +19,7 @@ var (
 			arpScanner := arp.GetARPScanner()
 			defer arpScanner.Close()
 			start := time.Now()
+			fmt.Printf("%-39s %-17s %-73s\n", "IP", "MAC", "VENDOR")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
@@ -68,7 +69,7 @@ func normalPrintf(timeoutCh chan struct{}, resultCh chan *arp.ARPScanResult) {
 	for {
 		select {
 		case result := <-resultCh:
-			fmt.Printf("%s\t%v\t%s\n", result.IP, result.Mac, result.Vendor)
+			fmt.Printf("%-39s %-17v %-73s\n", result.IP, result.Mac, result.Vendor)
 		case <-timeoutCh:
 			return
 		}

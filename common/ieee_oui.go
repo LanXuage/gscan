@@ -937,7 +937,7 @@ func GetOui() map[string]string {
 		"0050C2D88": "T+A elektroakustik GmbH & Co.KG",
 		"0050C2379": "Control LAN S.A.",
 		"0050C2FBD": "EATON FHF Funke + Huster Fernsig GmbH",
-		"0050C23DE": "ABB Power Technologies S.p.A.  Unità  Operativa SACE (PTMV)",
+		"0050C23DE": "ABB Power Technologies S.p.A.  Unità Operativa SACE (PTMV)",
 		"0050C2FD4": "Insitu, Inc",
 		"40D85517C": "Critical Link LLC",
 		"0050C2339": "Secure Systems & Services",

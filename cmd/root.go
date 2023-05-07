@@ -18,10 +18,10 @@ var (
  / /_/  >___ \\  \___ / __ \|   |  \
  \___  /____  >\___  >____  /___|  /
 /_____/     \/     \/     \/     \/ 
-https://github.com/LanXuage/gosam/gscan
+https://github.com/LanXuage/gscan
 
 A Scanner. `,
-		Version: "0.1.0",
+		Version: "0.1.1",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},

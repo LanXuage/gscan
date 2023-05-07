@@ -9,7 +9,7 @@
 - [x] ~~ARP scan~~
 - [ ] ICMP scan
 - [x] ~~TCP port scan~~
-- [ ] Domain support
+- [x] ~~Domain support~~
 - [ ] Random port support
 - [ ] UDP port scan
 - [ ] Service discovery
@@ -17,34 +17,18 @@
 
 # 使用
 
-## 运行环境
-
-目前，[发布包](https://github.com/LanXuage/gosam/releases)里的`gscan`采用的是`CGO`编译的动态链接可执行文件。所以需要提前安装下面这些简单的依赖：
-
-### debian/ubuntu
-
-```sh
-apt install libpcap-dev
-```
-
-### darwin(mac os)
-
-```sh
-brew install libpcap-dev
-```
-
-安装好上面的依赖就可以直接开始使用从[发布包](https://github.com/LanXuage/gosam/releases)里下载的对应系统和架构的可执行文件进行工作了。
+从[发布包](https://github.com/LanXuage/gosam/releases)里下载的对应系统和架构的可执行文件`gscan`。
 
 ## 查看帮助
 
 ```
 $ gscan help
 Gscan
-   ____  ______ ____ _____    ____
-  / ___\/  ___// ___\\__  \  /    \
+   ____  ______ ____ _____    ____  
+  / ___\/  ___// ___\\__  \  /    \ 
  / /_/  >___ \\  \___ / __ \|   |  \
  \___  /____  >\___  >____  /___|  /
-/_____/     \/     \/     \/     \/
+/_____/     \/     \/     \/     \/ 
 https://github.com/LanXuage/gosam/gscan
 
 A Scanner.
@@ -67,7 +51,7 @@ Flags:
   -H, --help            help for this command
   -I, --icmp            with icmp scan
   -O, --output string   normal, json or xml(unrealized) (default "normal")
-  -T, --timeout int     timeout global (default 3)
+  -T, --timeout int     global timeout(ms) (default 6500)
   -V, --version         version for gscan
 
 Use "gscan [command] --help" for more information about a command.
@@ -84,7 +68,7 @@ Use "gscan [command] --help" for more information about a command.
 $ gscan arp -a
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
 192.168.48.1    00:15:5d:ab:10:3a       Microsoft Corporation
-Cost: 3.016305977s
+Cost: 6.514218807s
 ```
 
 #### 对指定 IP 进行 arp 扫描
@@ -92,10 +76,10 @@ Cost: 3.016305977s
 ```sh
 $ gscan arp -h 192.168.50.179
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
-Cost: 3.001094879s
+Cost: 6.500702247s
 ```
 
-> 注意：默认超时为3秒，可以使用`-T`进行指定，目前支持秒级，下一版本将支持毫秒级。
+> 注意：默认超时为6500毫秒，可以使用`-T`进行指定，单位为毫秒。
 
 ### ICMP 扫描
 
@@ -161,7 +145,7 @@ Cost: 9.01656839s
 #### debain/ubuntu
 
 ```sh
-apt install libpcap-dev golang git
+apt install docker
 ```
 
 #### darwin(MacOS)
@@ -179,10 +163,10 @@ git clone https://github.com/LanXuage/gscan.git
 ### 编译
 
 ```sh
-env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o gscan cli/main.go
+make linux
 ```
 
-> 注意：其中的`GOOS`和`GOARCH`要根据具体的编译平台配置。
+编译完成会在项目目录下的`bin`目录生不同架构的`linux`静态可执行文件。
 
 ## 开发规范
 
