@@ -6,13 +6,14 @@
 
 # 特性
 
-- [x] ARP scan
-- ICMP scan
-- [x] TCP port scan
-- Domain support
-- UDP port scan
-- Service discovery
-- Vulnerability discovery
+- [x] ~~ARP scan~~
+- [ ] ICMP scan
+- [x] ~~TCP port scan~~
+- [ ] Domain support
+- [ ] Random port support
+- [ ] UDP port scan
+- [ ] Service discovery
+- [ ] Vulnerability discovery
 
 # 使用
 
@@ -20,11 +21,16 @@
 
 目前，[发布包](https://github.com/LanXuage/gosam/releases)里的`gscan`采用的是`CGO`编译的动态链接可执行文件。所以需要提前安装下面这些简单的依赖：
 
+### debian/ubuntu
+
 ```sh
-# debian/ubuntu
-$ apt install libpcap-dev
-# darwin(mac os)
-$ brew install libpcap-dev
+apt install libpcap-dev
+```
+
+### darwin(mac os)
+
+```sh
+brew install libpcap-dev
 ```
 
 安装好上面的依赖就可以直接开始使用从[发布包](https://github.com/LanXuage/gosam/releases)里下载的对应系统和架构的可执行文件进行工作了。
@@ -72,13 +78,18 @@ Use "gscan [command] --help" for more information about a command.
 
 ### ARP 扫描
 
+#### 对本地的整个局域网进行 arp 扫描
+
 ```sh
-# 对本地的整个局域网进行 arp 扫描
 $ gscan arp -a
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
 192.168.48.1    00:15:5d:ab:10:3a       Microsoft Corporation
 Cost: 3.016305977s
-# 对指定 IP 进行 arp 扫描
+```
+
+#### 对指定 IP 进行 arp 扫描
+
+```sh
 $ gscan arp -h 192.168.50.179
 192.168.50.179  00:15:5d:fa:d7:e7       Microsoft Corporation
 Cost: 3.001094879s
@@ -92,8 +103,9 @@ Cost: 3.001094879s
 
 ### TCP Port 扫描
 
+#### 对一个 IP 进行全端口探测
+
 ```sh
-# 对一个 IP 进行全端口探测
 $ gscan port -h 192.168.48.1 -p 0-65535
 IP                                      PORT                    TYPE    STATE
 192.168.48.1                            135(epmap)              tcp     open
@@ -105,7 +117,11 @@ IP                                      PORT                    TYPE    STATE
 192.168.48.1                            10808                   tcp     open
 192.168.48.1                            10809(nbd)              tcp     open
 Cost: 6.00483283s
-# 对一个 IP 进行全端口探测，结合ARP扫描结果
+```
+
+#### 对一个 IP 进行全端口探测，结合 ARP 扫描结果
+
+```sh
 $ gscan port -h 192.168.48.1 -p 0-65535 -A
 IP                                      MAC                     VENDOR                                          PORT                    TYPE    STATE
 192.168.48.1                            00:15:5d:ab:10:3a       Microsoft Corporation                           2179(vmrdp)             tcp     open
@@ -117,7 +133,11 @@ IP                                      MAC                     VENDOR          
 192.168.48.1                            00:15:5d:ab:10:3a       Microsoft Corporation                           7680(pando-pub)         tcp     open
 192.168.48.1                            00:15:5d:ab:10:3a       Microsoft Corporation                           10808                   tcp     open
 Cost: 9.013501996s
-# 使用全连接模式对一个 IP 进行全端口探测
+```
+
+#### 使用全连接模式对一个 IP 进行全端口探测
+
+```sh
 $ gscan port -h 192.168.48.1 -p 0-65535 -Af
 IP                                      MAC                     VENDOR                                          PORT                    TYPE    STATE
 192.168.48.1                            00:15:5d:ab:10:3a       Microsoft Corporation                           10808                   tcp     open
@@ -134,7 +154,39 @@ Cost: 9.01656839s
 
 # 开发
 
-待补充。
+## 从源码构建
+
+### 环境准备
+
+#### debain/ubuntu
+
+```sh
+apt install libpcap-dev golang git
+```
+
+#### darwin(MacOS)
+
+```sh
+brew install libpcap-dev golang git
+```
+
+### 拉取源码
+
+```sh
+git clone https://github.com/LanXuage/gscan.git
+```
+
+### 编译
+
+```sh
+env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o gscan cli/main.go
+```
+
+> 注意：其中的`GOOS`和`GOARCH`要根据具体的编译平台配置。
+
+## 开发规范
+
+参考[这里](doc/development.md)
 
 # 感谢
 
