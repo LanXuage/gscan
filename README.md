@@ -7,12 +7,12 @@
 # 特性
 
 - [x] ARP scan
-- [] ICMP scan
+- ICMP scan
 - [x] TCP port scan
-- [] Domain support
-- [] UDP port scan
-- [] Service discovery
-- [] Vulnerability discovery
+- Domain support
+- UDP port scan
+- Service discovery
+- Vulnerability discovery
 
 # 使用
 
