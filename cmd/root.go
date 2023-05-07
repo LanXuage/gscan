@@ -45,7 +45,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP("debug", "D", false, "set debug log level")
 	rootCmd.PersistentFlags().BoolP("help", "H", false, "help for this command")
 	rootCmd.PersistentFlags().BoolP("version", "V", false, "version for gscan")
-	rootCmd.PersistentFlags().Int64P("timeout", "T", 3, "timeout global")
+	rootCmd.PersistentFlags().Int64P("timeout", "T", 6500, "global timeout(ms)")
 	rootCmd.PersistentFlags().StringP("output", "O", "normal", "normal, json or xml(unrealized)")
 	rootCmd.PersistentFlags().StringP("file", "F", "", "file to output(unrealized)")
 	rootCmd.PersistentFlags().BoolVarP(&withARP, "arp", "A", false, "with arp scan")

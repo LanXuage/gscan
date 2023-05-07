@@ -2,8 +2,7 @@ package port
 
 import (
 	"gscan/common"
-	"gscan/common/constant"
-	"gscan/common/ports"
+	"math/rand"
 	"net"
 	"net/netip"
 	"time"
@@ -61,9 +60,9 @@ func (u *UDPScanner) GenerateTarget(ipList []net.IP) {
 			igMac, _ := arpInstance.AHMap.Get(ig)
 			tmp := &UDPTarget{
 				SrcIP:    iface.IP,
-				SrcPort:  layers.UDPPort(ports.DEFAULT_SOURCEPORT),
+				SrcPort:  layers.UDPPort(30768 + rand.Intn(34767)),
 				DstIP:    ip,
-				DstPorts: *ports.GetDefaultPorts(),
+				DstPorts: *common.GetDefaultPorts(),
 				SrcMac:   iface.HWAddr,
 				DstMac:   igMac,
 				Handle:   iface.Handle,
@@ -135,7 +134,7 @@ func (u *UDPScanner) SendUDP(target *UDPTarget) {
 
 func (u *UDPScanner) Recv() {
 	defer close(u.ResultCh)
-	for r := range common.GetReceiver().Register(constant.UDPREGISTER_NAME, u.RecvUDP) {
+	for r := range common.GetReceiver().Register(UDPREGISTER_NAME, u.RecvUDP) {
 		if result, ok := r.(*UDPResult); ok {
 			u.ResultCh <- result
 		}
@@ -157,11 +156,6 @@ func (u *UDPScanner) RecvUDP(packet gopacket.Packet) interface{} {
 	return nil
 }
 
-func (u *UDPScanner) CheckIPList(ipList []net.IP) {
-
-}
-
 func (u *UDPScanner) Close() {
-	<-u.Stop
-	common.GetReceiver().Unregister(constant.UDPREGISTER_NAME)
+	common.GetReceiver().Unregister(UDPREGISTER_NAME)
 }

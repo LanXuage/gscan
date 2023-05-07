@@ -9,5 +9,4 @@ const (
 // recevier register name
 const (
 	ICMPREGISTER_NAME string = "ICMP"
-	UDPREGISTER_NAME  string = "UDP"
 )

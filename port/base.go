@@ -15,6 +15,7 @@ var receiver = common.GetReceiver()
 
 const (
 	TCP_REGISTER_NAME = "TCP"
+	UDPREGISTER_NAME  = "UDP"
 	DEFAULT_PORTS     = 0
 	ALL_PORTS         = 1
 	CUSTOM_PORTS      = 2

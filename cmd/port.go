@@ -5,6 +5,7 @@ import (
 	"gscan/arp"
 	"gscan/common"
 	"gscan/port"
+	"net"
 	"net/netip"
 	"time"
 
@@ -22,16 +23,20 @@ var (
 			arpScanner := arp.GetARPScanner()
 			defer arpScanner.Close()
 			start := time.Now()
-			fmt.Printf("%-39s\t", "IP")
+			fmt.Printf("%-39s ", "IP")
 			if withARP {
-				fmt.Printf("%-17s\t%-40s\t", "MAC", "VENDOR")
+				fmt.Printf("%-17s %-40s ", "MAC", "VENDOR")
 			}
-			fmt.Printf("%-20s\t%-4s\t%-5s\n", "PORT", "TYPE", "STATE")
+			fmt.Printf("%-24s %-5s\n", "PORT", "STATE")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			tcpScanner.Timeout = time.Second * time.Duration(timeout)
-			arpScanner.Timeout = time.Second * time.Duration(timeout)
+			tcpScanner.Timeout = time.Millisecond * time.Duration(timeout)
+			if timeout > 2000 {
+				arpScanner.Timeout = 2000 * time.Microsecond
+			} else {
+				arpScanner.Timeout = time.Millisecond * time.Duration(timeout)
+			}
 			hosts, _ := cmd.Flags().GetStringArray("host")
 			logger.Debug("runE", zap.Any("host", hosts))
 			if len(hosts) == 0 {
@@ -97,18 +102,22 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 	for {
 		select {
 		case result := <-resultCh:
-			fmt.Printf("%-39s\t", result.IP)
+			fmt.Printf("%-39s ", result.IP)
 			if withARP {
-				if h, ok := arp.GetARPScanner().AHMap.Get(result.IP); ok {
+				vendor := ""
+				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
+				if ok {
 					prefix1, prefix2 := common.GetOuiPrefix(h)
-					vendor := arp.GetARPScanner().OMap[prefix2]
+					vendor = arp.GetARPScanner().OMap[prefix2]
 					if len(vendor) == 0 {
 						vendor = arp.GetARPScanner().OMap[prefix1]
 					}
-					fmt.Printf("%-17v\t%-40s\t", h, vendor)
+				} else {
+					h = net.HardwareAddr{}
 				}
+				fmt.Printf("%-17v %-40s ", h, vendor)
 			}
-			fmt.Printf("%-20v\t%-4s\t%-5s\n", result.Port, "tcp", "open")
+			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, "open")
 		case <-timeoutCh:
 			return
 		}
