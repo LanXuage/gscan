@@ -18,7 +18,7 @@ var (
  / /_/  >___ \\  \___ / __ \|   |  \
  \___  /____  >\___  >____  /___|  /
 /_____/     \/     \/     \/     \/ 
-https://github.com/LanXuage/gosam/gscan
+https://github.com/LanXuage/gscan
 
 A Scanner. `,
 		Version: "0.1.1",
