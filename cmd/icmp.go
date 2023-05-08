@@ -54,7 +54,7 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 		select {
 		case result := <-icmpScanner.ResultCh:
 			if result.IsActive {
-				fmt.Printf("%s\t\tActive\n", result.IP)
+				fmt.Printf("%s\t\tAlive\n", result.IP)
 			} else {
 				fmt.Printf("%s\t\tDied(Maybe)\n", result.IP)
 			}

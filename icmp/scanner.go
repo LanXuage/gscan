@@ -1,7 +1,6 @@
 package icmp
 
 import (
-	"fmt"
 	"gscan/arp"
 	"gscan/common"
 	"gscan/common/constant"
@@ -67,6 +66,7 @@ func NewICMPScanner() *ICMPScanner {
 
 func (icmpScanner *ICMPScanner) Close() {
 	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
+	close(icmpScanner.Stop)
 	close(icmpScanner.ResultCh)
 }
 
@@ -154,11 +154,9 @@ func (icmpScanner *ICMPScanner) generateTargetByIPList() {
 }
 
 func (icmpScanner *ICMPScanner) Scan() {
-	defer close(icmpScanner.Stop)
 	for target := range icmpScanner.TargetCh {
 		icmpScanner.SendICMP(target)
 	}
-	time.Sleep(icmpScanner.Timeout)
 }
 
 func (icmpScanner *ICMPScanner) ScanList(ipList []netip.Addr) chan struct{} {
@@ -168,7 +166,6 @@ func (icmpScanner *ICMPScanner) ScanList(ipList []netip.Addr) chan struct{} {
 	go icmpScanner.generateTargetByIPList()
 	go icmpScanner.CheckIPList()
 
-	time.Sleep(icmpScanner.Timeout)
 	return icmpScanner.TimeoutCh
 }
 
@@ -179,21 +176,17 @@ func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) chan struct{} {
 	go icmpScanner.generateTargetByIPList()
 	go icmpScanner.CheckIPList()
 
-	time.Sleep(icmpScanner.Timeout)
 	return icmpScanner.TimeoutCh
 }
 
 // CIDR Scanner
 func (icmpScanner *ICMPScanner) ScanListByPrefix(prefix netip.Prefix) chan struct{} {
-
 	logger.Debug("开始生成扫描目标")
 	go icmpScanner.goGenerateTargetPrefix(prefix)
 
 	logger.Debug("开始校验扫描结果")
 	go icmpScanner.CheckIPList()
 
-	time.Sleep(icmpScanner.Timeout)
-	fmt.Println("111")
 	return icmpScanner.TimeoutCh
 }
 
@@ -268,7 +261,8 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 
 // 校验IPLIST
 func (icmpScanner *ICMPScanner) CheckIPList() {
-	<-icmpScanner.Stop
+	defer close(icmpScanner.TimeoutCh)
+	time.Sleep(icmpScanner.Timeout)
 	for _, ip := range icmpScanner.IPList {
 		if _, ok := (*icmpScanner.Results).Get(ip.String()); !ok {
 			// 该IP未进扫描结果，此时发包结束，并且经过一定时间的延时，未收到返回包，说明并未Ping通
