@@ -12,7 +12,7 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
-	# env CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build ${WIN-FLAGS} -o ${DIRECTORY}/${WIN}-amd64.exe cli/main.go
+	env CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build ${WIN-FLAGS} -o ${DIRECTORY}/${WIN}-amd64.exe cli/main.go
 	# env CGO_ENABLED=1 GOOS=windows GOARCH=arm64 go build ${WIN-FLAGS} -o ${DIRECTORY}/${WIN}-arm64.exe cli/main.go
 	# env CGO_ENABLED=1 GOOS=windows GOARCH=386 CGO_LDFLAGS=-m32 go build ${WIN-FLAGS} -o ${DIRECTORY}/${WIN}-386.exe cli/main.go
 
