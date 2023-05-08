@@ -10,3 +10,7 @@ const (
 const (
 	ICMPREGISTER_NAME string = "ICMP"
 )
+
+const (
+	CHANNEL_SIZE uint8 = 10
+)

@@ -8,7 +8,7 @@ import (
 )
 
 func TestICMPScanner(t *testing.T) {
-	i := icmp.New()
+	i := icmp.NewICMPScanner()
 	defer i.Close()
 	ipList := []string{"13.107.21.200", "120.78.212.208", "183.6.50.84", "192.168.31.1", "192.168.31.100", "172.25.156.84"}
 	tmp := common.IPList2NetIPList(ipList)

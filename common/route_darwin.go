@@ -55,7 +55,7 @@ func Gways() []netip.Addr {
 
 			// 获取网卡其他信息
 			gateway := string(bytes.Split(infoByte[2], []byte(": "))[1])
-			fmt.Println(gateway)
+			// fmt.Println(gateway)
 			res, err := netip.ParseAddr(gateway)
 			if err != nil {
 				continue

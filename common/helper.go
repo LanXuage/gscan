@@ -84,12 +84,25 @@ func GetHandle(deviceName string) *pcap.Handle {
 	return handle
 }
 
-func IPList2NetIPList(ipList []string) []net.IP {
+// Deprecated: use IPList2NetIPList instead
+func _IPList2NetIPList(ipList []string) []net.IP {
 	s := []net.IP{}
 	for _, ip := range ipList {
 		s = append(s, net.ParseIP(ip).To4())
 	}
 	return s
+}
+
+func IPList2NetIPList(ipList []string) []netip.Addr {
+	ret := []netip.Addr{}
+	for _, ip := range ipList {
+		res, err := netip.ParseAddr(ip)
+		if err != nil {
+			logger.Error("IP Format Error!")
+		}
+		ret = append(ret, res)
+	}
+	return ret
 }
 
 // Deprecated: Use common.IsSameLAN instead.
