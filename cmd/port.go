@@ -19,7 +19,7 @@ var (
 		Short: "PORT Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tcpScanner := port.GetTCPScanner()
-			defer tcpScanner.Close()
+			// defer tcpScanner.Close()
 			arpScanner := arp.GetARPScanner()
 			defer arpScanner.Close()
 			start := time.Now()

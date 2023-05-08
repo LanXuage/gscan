@@ -31,16 +31,16 @@ type ARPScanner struct {
 }
 
 func (a *ARPScanner) Close() {
+	defer close(a.TargetCh)
+	defer close(a.ResultCh)
 	receiver.Unregister(REGISTER_NAME)
-	close(a.TargetCh)
-	close(a.ResultCh)
 }
 
 func (a *ARPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {
 	for i := 0; i < 2; i++ {
 		nIp := prefix.Addr()
 		for {
-			if (nIp.Is4() && nIp.AsSlice()[3] != 0) || (nIp.Is6() && nIp.AsSlice()[15] != 0) {
+			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
 				if iface.Gateway == nIp {
 					prefix1, prefix2 := common.GetOuiPrefix(iface.HWAddr)
 					vendor := a.OMap[prefix2]
@@ -75,21 +75,21 @@ func (a *ARPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GS
 
 // 目标生产协程
 func (a *ARPScanner) GenerateTarget(timeoutCh chan struct{}) {
+	defer close(timeoutCh)
 	for _, iface := range *a.Ifas {
 		a.generateTargetByPrefix(iface.Mask, iface)
 	}
 	time.Sleep(a.Timeout)
-	close(timeoutCh)
 }
 
 func (a *ARPScanner) goScanPrefix(prefix netip.Prefix, timetouCh chan struct{}) {
+	defer close(timetouCh)
 	for _, iface := range *a.Ifas {
 		if iface.Mask.Contains(prefix.Addr()) {
 			a.generateTargetByPrefix(prefix, iface)
 		}
 	}
 	time.Sleep(a.Timeout)
-	close(timetouCh)
 }
 
 func (a *ARPScanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
@@ -99,6 +99,7 @@ func (a *ARPScanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
 }
 
 func (a *ARPScanner) goScanMany(ips []netip.Addr, timeoutCh chan struct{}) {
+	defer close(timeoutCh)
 	for _, ip := range ips {
 		for _, iface := range *a.Ifas {
 			logger.Debug("so", zap.Any("ip", iface.Gateway))
@@ -126,7 +127,6 @@ func (a *ARPScanner) goScanMany(ips []netip.Addr, timeoutCh chan struct{}) {
 		}
 	}
 	time.Sleep(a.Timeout)
-	close(timeoutCh)
 }
 
 func (a *ARPScanner) ScanMany(ips []netip.Addr) chan struct{} {
@@ -146,7 +146,6 @@ func (a *ARPScanner) ScanLocalNet() chan struct{} {
 
 // 接收协程
 func (a *ARPScanner) Recv() {
-	defer close(a.ResultCh)
 	for r := range receiver.Register(REGISTER_NAME, a.RecvARP) {
 		if results, ok := r.(ARPScanResults); ok {
 			for _, result := range results.Results {
@@ -197,6 +196,7 @@ func (a *ARPScanner) SendARPReq(target *Target) {
 	if err != nil {
 		logger.Error("WritePacketData Failed", zap.Error(err))
 	}
+	time.Sleep(time.Microsecond * 1001)
 }
 
 // 接收协程

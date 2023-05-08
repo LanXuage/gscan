@@ -22,6 +22,8 @@ type TCPScanner struct {
 	UseFullTCP   bool
 	PortScanType int8
 	Ports        []layers.TCPPort
+	gCount       int64
+	sCount       int64
 }
 
 func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
@@ -68,6 +70,7 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 				Ack:      tcp.Seq + 1,
 				Handle:   iface.Handle,
 			}
+			t.gCount += 1
 			return nil
 		}
 	}
@@ -85,7 +88,6 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 }
 
 func (t *TCPScanner) Recv() {
-	defer close(t.ResultCh)
 	for r := range receiver.Register(TCP_REGISTER_NAME, t.RecvTCP) {
 		if result, ok := r.(*TCPResult); ok {
 			t.ResultCh <- result
@@ -166,19 +168,21 @@ func (t *TCPScanner) SendSYNACK(target *TCPTarget) {
 		if err := target.Handle.WritePacketData(data); err != nil {
 			logger.Error("WritePacketData Failed", zap.Error(err))
 		}
+		time.Sleep(time.Microsecond * 1002)
 	}
 }
 
 func (t *TCPScanner) Scan() {
 	for target := range t.TargetCh {
 		t.SendSYNACK(target)
+		t.sCount += 1
 	}
 }
 
 func (t *TCPScanner) Close() {
+	defer close(t.TargetCh)
+	defer close(t.ResultCh)
 	receiver.Unregister(TCP_REGISTER_NAME)
-	close(t.TargetCh)
-	close(t.ResultCh)
 }
 
 func (t *TCPScanner) ScanLocalNet() chan struct{} {
@@ -188,11 +192,21 @@ func (t *TCPScanner) ScanLocalNet() chan struct{} {
 }
 
 func (t *TCPScanner) generateLocalNetTarget(timeoutCh chan struct{}) {
+	defer t.waitTimeout(timeoutCh)
 	for _, iface := range *common.GetActiveIfaces() {
 		t.generateTargetByPrefix(iface.Mask, iface)
 	}
+}
+
+func (t *TCPScanner) waitTimeout(timeoutCh chan struct{}) {
+	defer close(timeoutCh)
+	for {
+		time.Sleep(time.Microsecond * 100)
+		if t.gCount == t.sCount && len(t.TargetCh) == 0 {
+			break
+		}
+	}
 	time.Sleep(t.Timeout)
-	close(timeoutCh)
 }
 
 func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
@@ -218,13 +232,14 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 		DstPorts: dstPorts,
 		Handle:   iface.Handle,
 	}
+	t.gCount += 1
 }
 
 func (t *TCPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {
 	for i := 0; i < 2; i++ {
 		nIp := prefix.Addr()
 		for {
-			if (nIp.Is4() && nIp.AsSlice()[3] != 0) || (nIp.Is6() && nIp.AsSlice()[15] != 0) {
+			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
 				if !nIp.IsValid() || !prefix.Contains(nIp) || !iface.Mask.Contains(nIp) {
 					break
 				} else {
@@ -241,13 +256,12 @@ func (t *TCPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GS
 }
 
 func (t *TCPScanner) goScanMany(targetIPs []netip.Addr, timeoutCh chan struct{}) {
+	defer t.waitTimeout(timeoutCh)
 	for _, targetIP := range targetIPs {
 		for _, iface := range *common.GetActiveIfaces() {
 			t.generateTarget(targetIP, iface)
 		}
 	}
-	time.Sleep(t.Timeout)
-	close(timeoutCh)
 }
 
 func (t *TCPScanner) ScanMany(targetIPs []netip.Addr) chan struct{} {
@@ -256,14 +270,13 @@ func (t *TCPScanner) ScanMany(targetIPs []netip.Addr) chan struct{} {
 	return timeoutCh
 }
 
-func (t *TCPScanner) goScanPrefix(prefix netip.Prefix, timetouCh chan struct{}) {
+func (t *TCPScanner) goScanPrefix(prefix netip.Prefix, timeoutCh chan struct{}) {
+	defer t.waitTimeout(timeoutCh)
 	for _, iface := range *arpInstance.Ifas {
 		if iface.Mask.Contains(prefix.Addr()) {
 			t.generateTargetByPrefix(prefix, iface)
 		}
 	}
-	time.Sleep(t.Timeout)
-	close(timetouCh)
 }
 
 func (t *TCPScanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
