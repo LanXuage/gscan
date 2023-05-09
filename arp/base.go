@@ -9,6 +9,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	cmap "github.com/orcaman/concurrent-map/v2"
+	"go.uber.org/zap"
 )
 
 const (
@@ -63,9 +64,20 @@ func newARPScanner() *ARPScanner {
 			DstIP:  iface.Gateway,
 			Handle: iface.Handle,
 		}
-		for res := range a.ResultCh {
-			if iface.Gateway == res.IP {
-				break
+		timeoutCh := make(chan struct{})
+		go func(timeoutCh chan struct{}, timeout time.Duration) {
+			defer close(timeoutCh)
+			time.Sleep(timeout)
+		}(timeoutCh, a.Timeout)
+	L1:
+		for {
+			select {
+			case res := <-a.ResultCh:
+				if iface.Gateway == res.IP {
+					break L1
+				}
+			case <-timeoutCh:
+				logger.Panic("Get gateway's hardwareaddr failed. ", zap.Any("iface", iface))
 			}
 		}
 	}
