@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gscan/cmd"
+	"github.com/LanXuage/gscan/cmd"
 )
 
 func main() {

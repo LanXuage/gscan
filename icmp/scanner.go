@@ -1,13 +1,14 @@
 package icmp
 
 import (
-	"gscan/arp"
-	"gscan/common"
-	"gscan/common/constant"
 	"log"
 	"net"
 	"net/netip"
 	"time"
+
+	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/common/constant"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

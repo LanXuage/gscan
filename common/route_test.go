@@ -1,8 +1,9 @@
 package common_test
 
 import (
-	"gscan/common"
 	"testing"
+
+	"github.com/LanXuage/gscan/common"
 )
 
 func TestGetGateways(t *testing.T) {
