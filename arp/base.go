@@ -58,6 +58,9 @@ func newARPScanner() *ARPScanner {
 	go a.Recv()
 	go a.Scan()
 	for _, iface := range *a.Ifas {
+		if iface.Gateway == iface.IP {
+			continue
+		}
 		a.TargetCh <- &Target{
 			SrcMac: iface.HWAddr,
 			SrcIP:  iface.IP,
