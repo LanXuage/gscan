@@ -1,4 +1,4 @@
-module gscan
+module github.com/LanXuage/gscan
 
 go 1.19
 

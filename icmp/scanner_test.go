@@ -1,10 +1,11 @@
 package icmp_test
 
 import (
-	"gscan/common"
-	"gscan/icmp"
 	"testing"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/icmp"
 )
 
 func TestICMPScanner(t *testing.T) {

@@ -1,14 +1,16 @@
 package arp
 
 import (
-	"gscan/common"
 	"net"
 	"net/netip"
 	"time"
 
+	"github.com/LanXuage/gscan/common"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	cmap "github.com/orcaman/concurrent-map/v2"
+	"go.uber.org/zap"
 )
 
 const (
@@ -57,15 +59,29 @@ func newARPScanner() *ARPScanner {
 	go a.Recv()
 	go a.Scan()
 	for _, iface := range *a.Ifas {
+		if iface.Gateway == iface.IP {
+			continue
+		}
 		a.TargetCh <- &Target{
 			SrcMac: iface.HWAddr,
 			SrcIP:  iface.IP,
 			DstIP:  iface.Gateway,
 			Handle: iface.Handle,
 		}
-		for res := range a.ResultCh {
-			if iface.Gateway == res.IP {
-				break
+		timeoutCh := make(chan struct{})
+		go func(timeoutCh chan struct{}, timeout time.Duration) {
+			defer close(timeoutCh)
+			time.Sleep(timeout)
+		}(timeoutCh, a.Timeout)
+	L1:
+		for {
+			select {
+			case res := <-a.ResultCh:
+				if iface.Gateway == res.IP {
+					break L1
+				}
+			case <-timeoutCh:
+				logger.Panic("Get gateway's hardwareaddr failed. ", zap.Any("iface", iface))
 			}
 		}
 	}

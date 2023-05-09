@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"gscan/arp"
-	"gscan/common"
-	"gscan/port"
 	"net"
 	"net/netip"
 	"time"
+
+	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/port"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,7 +20,7 @@ var (
 		Short: "PORT Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tcpScanner := port.GetTCPScanner()
-			defer tcpScanner.Close()
+			// defer tcpScanner.Close()
 			arpScanner := arp.GetARPScanner()
 			defer arpScanner.Close()
 			start := time.Now()

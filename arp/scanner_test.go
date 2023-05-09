@@ -1,9 +1,10 @@
 package arp_test
 
 import (
-	"gscan/arp"
 	"testing"
 	"time"
+
+	"github.com/LanXuage/gscan/arp"
 )
 
 func Test_ARPScanner(t *testing.T) {
