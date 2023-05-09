@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"gscan/common"
-	"gscan/icmp"
 	"net/netip"
 	"time"
 

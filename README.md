@@ -89,7 +89,6 @@ Cost: 6.500702247s
 $ gscan icmp -h 192.168.1.1/24 
 IP			        Status
 192.168.1.1     Alive
-192.168.1.2     Died(Maybe)
 Cost: 4.009240208s
 ```
 
