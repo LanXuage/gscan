@@ -1,9 +1,10 @@
 package port_test
 
 import (
-	"gscan/port"
 	"net/netip"
 	"testing"
+
+	"github.com/LanXuage/gscan/port"
 )
 
 func parseAddr(ip string) netip.Addr {

@@ -35,7 +35,7 @@ func newReceiver() *Receiver {
 }
 
 func (r *Receiver) init() {
-	for _, gsInterface := range *GetActiveInterfaces() {
+	for _, gsInterface := range *GetActiveIfaces() {
 		src := gopacket.NewPacketSource(gsInterface.Handle, layers.LayerTypeEthernet)
 		logger.Debug("Start receiver", zap.String("gsIface", gsInterface.Name))
 		p, err := ants.NewPoolWithFunc(10, r.recv)

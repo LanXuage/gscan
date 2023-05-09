@@ -1,10 +1,11 @@
 package port
 
 import (
-	"gscan/arp"
-	"gscan/common"
 	"net"
 	"net/netip"
+
+	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/common"
 
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"

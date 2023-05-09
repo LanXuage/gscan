@@ -3,6 +3,7 @@ package common
 import (
 	"net"
 	"net/netip"
+	"strings"
 
 	"github.com/google/gopacket/pcap"
 	"go.uber.org/zap"
@@ -110,19 +111,25 @@ func getActiveIfaces() *[]GSIface {
 					continue
 				}
 				for _, i := range ifs {
-					if i.Name != dev.Name {
+					addrs, err := i.Addrs()
+					if err != nil {
 						continue
 					}
-					gsInterface := GSIface{
-						Name:    i.Name,
-						Gateway: gateway,
-						Mask:    ipPrefix,
-						Handle:  GetHandle(i.Name),
-						HWAddr:  i.HardwareAddr,
-						IP:      ip,
+					for _, iAddr := range addrs {
+						if strings.Contains(iAddr.String(), ip.String()) {
+							gsInterface := GSIface{
+								Name:    dev.Name,
+								Gateway: gateway,
+								Mask:    ipPrefix,
+								Handle:  GetHandle(dev.Name),
+								HWAddr:  i.HardwareAddr,
+								IP:      ip,
+							}
+							logger.Debug("Get gs iface", zap.Any("gsIface", gsInterface))
+							gsInterfaces = append(gsInterfaces, gsInterface)
+							break
+						}
 					}
-					logger.Debug("Get gs iface", zap.Any("gsIface", gsInterface))
-					gsInterfaces = append(gsInterfaces, gsInterface)
 				}
 
 			}

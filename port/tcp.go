@@ -1,10 +1,11 @@
 package port
 
 import (
-	"gscan/common"
 	"math/rand"
 	"net/netip"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

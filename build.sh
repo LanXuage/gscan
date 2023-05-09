@@ -9,4 +9,4 @@ go env -w GO111MODULE=on
 go env -w GOPROXY=https://goproxy.cn,direct
 cd /mnt
 go mod tidy
-env CGO_ENABLED=1 GOOS=linux go build --ldflags '-linkmode external -extldflags "-static -s -w"' -o ${DIRECTORY}/${LINUX}-${GOARCH} cli/main.go
+env CGO_ENABLED=1 go build --ldflags "${LDFLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}${SUFFIX} cli/main.go

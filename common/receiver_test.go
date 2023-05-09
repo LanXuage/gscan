@@ -1,10 +1,11 @@
 package common_test
 
 import (
-	"gscan/common"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
 
 	"github.com/google/gopacket"
 )

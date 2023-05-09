@@ -1,8 +1,9 @@
 package cmd_test
 
 import (
-	"gscan/cmd"
 	"testing"
+
+	"github.com/LanXuage/gscan/cmd"
 )
 
 func TestParseAddr(t *testing.T) {

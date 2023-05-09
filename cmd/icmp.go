@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"gscan/common"
-	"gscan/icmp"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/icmp"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

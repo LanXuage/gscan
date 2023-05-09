@@ -28,7 +28,7 @@ func Gways() []netip.Addr {
 			}
 			for _, attr := range attrs {
 				if attr.Attr.Type == syscall.RTA_GATEWAY {
-					if g, ok := netip.AddrFromSlice(attr.Value); ok {
+					if g, ok := netip.AddrFromSlice(attr.Value); ok && g != localhost {
 						ret = append(ret, g)
 					}
 				}
