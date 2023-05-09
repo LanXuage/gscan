@@ -2,7 +2,7 @@
 set -ex
 sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 apk update
-apk add linux-headers musl-dev gcc go libpcap-dev ca-certificates git
+apk add linux-headers musl-dev gcc go libpcap-dev ca-certificates git python3
 mkdir /go
 export GOPATH=/go
 go env -w GO111MODULE=on

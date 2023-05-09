@@ -20,10 +20,30 @@ darwin:
 	# env CGO_ENABLED=1 GOOS=darwin GOARCH=386 CGO_LDFLAGS=-m32 go build ${FLAGS} -o ${DIRECTORY}/${LINUX}-386 cli/main.go
 
 linux:
-	echo "Compiling static Linux binary"
+	echo "Compiling Linux binary"
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=amd64 -e LDFLAGS="${LINUX_FLAGS}" -itv $(PWD):/mnt amd64/alpine:3.17 /mnt/build.sh
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=386 -e LDFLAGS="${LINUX_FLAGS}" -itv $(PWD):/mnt i386/alpine:3.17 /mnt/build.sh
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=arm64 -e LDFLAGS="${LINUX_FLAGS}" -itv $(PWD):/mnt arm64v8/alpine:3.17 /mnt/build.sh
-	
+
 clean:
 	rm -rf ${DIRECTORY}
+
+wheel:
+	echo "Compiling Python wheel"
+	. .venv/bin/activate
+	pip install -r requestments_build_wheel.txt
+	cp ${DIRECTORY}/gscan-linux-amd64 ${DIRECTORY}/gscan
+	python setup.py bdist_wheel
+	auditwheel repair dist/gscan-*.*.*-py3-none-any.whl
+	cp ${DIRECTORY}/gscan-linux-386 ${DIRECTORY}/gscan
+	python setup.py bdist_wheel
+	auditwheel repair dist/gscan-*.*.*-py3-none-any.whl
+	cp ${DIRECTORY}/gscan-linux-arm64 ${DIRECTORY}/gscan
+	python setup.py bdist_wheel
+	auditwheel repair dist/gscan-*.*.*-py3-none-any.whl
+	cp ${DIRECTORY}/gscan-windows-amd64 ${DIRECTORY}/gscan
+	python setup.py bdist_wheel
+	auditwheel repair dist/gscan-*.*.*-py3-none-any.whl
+	cp ${DIRECTORY}/gscan-windwos-386 ${DIRECTORY}/gscan
+	python setup.py bdist_wheel
+	auditwheel repair dist/gscan-*.*.*-py3-none-any.whl
