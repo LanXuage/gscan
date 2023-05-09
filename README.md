@@ -7,7 +7,7 @@
 # 特性
 
 - [x] ~~ARP scan~~
-- [ ] ICMP scan
+- [x] ICMP scan
 - [x] ~~TCP port scan~~
 - [x] ~~Domain support~~
 - [ ] Random port support
@@ -83,7 +83,27 @@ Cost: 6.500702247s
 
 ### ICMP 扫描
 
-待补充。
+### 单IP or 网段 主机存活探测
+
+```sh
+$ gscan icmp -h 192.168.1.1/24 
+IP			        Status
+192.168.1.1     Alive
+192.168.1.2     Died(Maybe)
+Cost: 4.009240208s
+```
+
+### 多目标 存活探测
+
+```sh
+$ gscan icmp -h 192.168.1.1 -h 192.168.2.2
+IP              Status
+192.168.1.1     Alive
+192.168.2.2     Alive
+Cost: 4.002214791s
+
+```
+
 
 ### TCP Port 扫描
 

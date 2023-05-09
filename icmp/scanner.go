@@ -20,13 +20,12 @@ var arpInstance = arp.GetARPScanner()
 var logger = common.GetLogger()
 
 type ICMPScanner struct {
-	Stop      chan struct{} // 发包结束的信号
-	TimeoutCh chan struct{}
-	Results   ICMPResultMap        // 存放本次扫描结果
-	TargetCh  chan *ICMPTarget     // 暂存单个所需扫描的IP
-	ResultCh  chan *ICMPScanResult // 暂存单个IP扫描结果
-	IPList    []netip.Addr         // 存放本次所需扫描的IP
-	Timeout   time.Duration        // 默认超时时间
+	Stop     chan struct{}        // 发包结束的信号
+	Results  ICMPResultMap        // 存放本次扫描结果
+	TargetCh chan *ICMPTarget     // 暂存单个所需扫描的IP
+	ResultCh chan *ICMPScanResult // 暂存单个IP扫描结果
+	IPList   []netip.Addr         // 存放本次所需扫描的IP
+	Timeout  time.Duration        // 默认超时时间
 }
 
 type ICMPTarget struct {
@@ -49,13 +48,12 @@ func NewICMPScanner() *ICMPScanner {
 	rMap := ICMPResultMap(&_rMap)
 
 	icmpScanner := &ICMPScanner{
-		Stop:      make(chan struct{}),
-		TimeoutCh: make(chan struct{}),
-		TargetCh:  make(chan *ICMPTarget, constant.CHANNEL_SIZE),
-		ResultCh:  make(chan *ICMPScanResult, constant.CHANNEL_SIZE),
-		Results:   rMap,
-		IPList:    []netip.Addr{},
-		Timeout:   time.Second * 3,
+		Stop:     make(chan struct{}),
+		TargetCh: make(chan *ICMPTarget, constant.CHANNEL_SIZE),
+		ResultCh: make(chan *ICMPScanResult, constant.CHANNEL_SIZE),
+		Results:  rMap,
+		IPList:   []netip.Addr{},
+		Timeout:  time.Second * 3,
 	}
 
 	go icmpScanner.Recv()
@@ -68,6 +66,7 @@ func (icmpScanner *ICMPScanner) Close() {
 	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
 	close(icmpScanner.Stop)
 	close(icmpScanner.ResultCh)
+	close(icmpScanner.TargetCh)
 }
 
 // ICMP发包
@@ -160,38 +159,47 @@ func (icmpScanner *ICMPScanner) Scan() {
 }
 
 func (icmpScanner *ICMPScanner) ScanList(ipList []netip.Addr) chan struct{} {
+	timeoutCh := make(chan struct{})
 	icmpScanner.IPList = ipList
-	// icmpScanner.filterIPList()
 
 	go icmpScanner.generateTargetByIPList()
-	go icmpScanner.CheckIPList()
+	go icmpScanner.CheckIPList(timeoutCh)
 
-	return icmpScanner.TimeoutCh
+	return timeoutCh
 }
 
 func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) chan struct{} {
+	timeoutCh := make(chan struct{})
 
 	icmpScanner.IPList = append(icmpScanner.IPList, ip)
+	for _, iface := range *arpInstance.Ifas {
+		if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
+			icmpScanner.TargetCh <- &ICMPTarget{
+				SrcIP:  iface.IP,
+				DstIP:  ip,
+				SrcMac: iface.HWAddr,
+				Handle: iface.Handle,
+				DstMac: dstMac,
+			}
+		}
+	}
 
-	go icmpScanner.generateTargetByIPList()
-	go icmpScanner.CheckIPList()
+	go icmpScanner.CheckIPList(timeoutCh)
 
-	return icmpScanner.TimeoutCh
+	return timeoutCh
 }
 
 // CIDR Scanner
 func (icmpScanner *ICMPScanner) ScanListByPrefix(prefix netip.Prefix) chan struct{} {
-	logger.Debug("开始生成扫描目标")
+	timeoutCh := make(chan struct{})
+
 	go icmpScanner.goGenerateTargetPrefix(prefix)
+	go icmpScanner.CheckIPList(timeoutCh)
 
-	logger.Debug("开始校验扫描结果")
-	go icmpScanner.CheckIPList()
-
-	return icmpScanner.TimeoutCh
+	return timeoutCh
 }
 
 func (icmpScanner *ICMPScanner) goGenerateTargetPrefix(prefix netip.Prefix) {
-	defer close(icmpScanner.TargetCh)
 	for _, iface := range *arpInstance.Ifas {
 		icmpScanner.generateTargetByPrefix(prefix, iface)
 	}
@@ -260,8 +268,8 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 }
 
 // 校验IPLIST
-func (icmpScanner *ICMPScanner) CheckIPList() {
-	defer close(icmpScanner.TimeoutCh)
+func (icmpScanner *ICMPScanner) CheckIPList(timeoutCh chan struct{}) {
+
 	time.Sleep(icmpScanner.Timeout)
 	for _, ip := range icmpScanner.IPList {
 		if _, ok := (*icmpScanner.Results).Get(ip.String()); !ok {
@@ -273,6 +281,7 @@ func (icmpScanner *ICMPScanner) CheckIPList() {
 			(*icmpScanner.Results).Set(ip.String(), false)
 		}
 	}
+	close(timeoutCh)
 }
 
 var icmpInstance = NewICMPScanner()
