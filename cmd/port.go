@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"gscan/arp"
-	"gscan/common"
-	"gscan/port"
 	"net"
 	"net/netip"
 	"time"
+
+	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/port"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

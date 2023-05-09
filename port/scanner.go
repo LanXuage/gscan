@@ -1,9 +1,10 @@
 package port
 
 import (
-	"gscan/common"
 	"net"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
 
 	"github.com/google/gopacket/layers"
 )

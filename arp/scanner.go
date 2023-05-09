@@ -1,11 +1,12 @@
 package arp
 
 import (
-	"gscan/common"
 	"net"
 	"net/netip"
 	"sync"
 	"time"
+
+	"github.com/LanXuage/gscan/common"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

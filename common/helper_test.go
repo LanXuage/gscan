@@ -1,9 +1,10 @@
 package common_test
 
 import (
-	"gscan/common"
 	"net"
 	"testing"
+
+	"github.com/LanXuage/gscan/common"
 )
 
 var ip = net.ParseIP("192.168.1.2").To4()
