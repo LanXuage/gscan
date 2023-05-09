@@ -125,33 +125,6 @@ func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
 
 }
 
-func (icmpScanner *ICMPScanner) generateTargetByIPList() {
-	defer close(icmpScanner.TargetCh)
-	if arpInstance.Ifaces == nil {
-		logger.Fatal("Get Ifaces Failed")
-		return
-	}
-
-	if len(icmpScanner.IPList) == 0 {
-		logger.Fatal("IPList is NULL")
-		return
-	}
-
-	for _, iface := range *arpInstance.Ifas {
-		if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
-			for _, ip := range icmpScanner.IPList {
-				icmpScanner.TargetCh <- &ICMPTarget{
-					SrcIP:  iface.IP,
-					DstIP:  ip,
-					SrcMac: iface.HWAddr,
-					Handle: iface.Handle,
-					DstMac: dstMac,
-				}
-			}
-		}
-	}
-}
-
 func (icmpScanner *ICMPScanner) Scan() {
 	for target := range icmpScanner.TargetCh {
 		icmpScanner.SendICMP(target)
@@ -160,18 +133,11 @@ func (icmpScanner *ICMPScanner) Scan() {
 
 func (icmpScanner *ICMPScanner) ScanList(ipList []netip.Addr) chan struct{} {
 	timeoutCh := make(chan struct{})
-	icmpScanner.IPList = ipList
-
-	go icmpScanner.generateTargetByIPList()
-	go icmpScanner.CheckIPList(timeoutCh)
-
+	go icmpScanner.goGenerateTargetByIPList(ipList, timeoutCh)
 	return timeoutCh
 }
 
-func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) chan struct{} {
-	timeoutCh := make(chan struct{})
-
-	icmpScanner.IPList = append(icmpScanner.IPList, ip)
+func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) {
 	for _, iface := range *arpInstance.Ifas {
 		if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
 			icmpScanner.TargetCh <- &ICMPTarget{
@@ -183,26 +149,51 @@ func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) chan struct{} {
 			}
 		}
 	}
+}
 
-	go icmpScanner.CheckIPList(timeoutCh)
+func (icmpScanner *ICMPScanner) goGenerateTargetByIPList(ipList []netip.Addr, timeoutCh chan struct{}) {
+	if arpInstance.Ifaces == nil {
+		logger.Fatal("Get Ifaces Failed")
+		return
+	}
 
-	return timeoutCh
+	if len(ipList) == 0 {
+		logger.Fatal("IPList is NULL")
+		return
+	}
+
+	for _, iface := range *arpInstance.Ifas {
+		if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
+			for _, ip := range ipList {
+				icmpScanner.TargetCh <- &ICMPTarget{
+					SrcIP:  iface.IP,
+					DstIP:  ip,
+					SrcMac: iface.HWAddr,
+					Handle: iface.Handle,
+					DstMac: dstMac,
+				}
+			}
+		}
+	}
+
+	time.Sleep(icmpScanner.Timeout)
+	close(timeoutCh)
 }
 
 // CIDR Scanner
 func (icmpScanner *ICMPScanner) ScanListByPrefix(prefix netip.Prefix) chan struct{} {
 	timeoutCh := make(chan struct{})
-
-	go icmpScanner.goGenerateTargetPrefix(prefix)
-	go icmpScanner.CheckIPList(timeoutCh)
-
+	go icmpScanner.goGenerateTargetPrefix(prefix, timeoutCh)
 	return timeoutCh
 }
 
-func (icmpScanner *ICMPScanner) goGenerateTargetPrefix(prefix netip.Prefix) {
+func (icmpScanner *ICMPScanner) goGenerateTargetPrefix(prefix netip.Prefix, timeoutCh chan struct{}) {
 	for _, iface := range *arpInstance.Ifas {
 		icmpScanner.generateTargetByPrefix(prefix, iface)
 	}
+
+	time.Sleep(icmpScanner.Timeout)
+	close(timeoutCh)
 }
 
 func (icmpScanner *ICMPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {

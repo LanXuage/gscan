@@ -33,7 +33,9 @@ var (
 					logger.Debug("runE", zap.Any("host", host))
 					if ip, err := netip.ParseAddr(host); err == nil {
 						logger.Debug("icmp", zap.Any("ip", ip))
-						timeoutCh := icmpScanner.ScanOne(ip)
+						ipList := []netip.Addr{}
+						ipList = append(ipList, ip)
+						timeoutCh := icmpScanner.ScanList(ipList)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 					if prefix, err := netip.ParsePrefix(host); err == nil {
@@ -56,8 +58,6 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 		case result := <-icmpScanner.ResultCh:
 			if result.IsActive {
 				fmt.Printf("%s\t\tAlive\n", result.IP)
-			} else {
-				fmt.Printf("%s\t\tDied(Maybe)\n", result.IP)
 			}
 		case <-timeoutCh:
 			return
