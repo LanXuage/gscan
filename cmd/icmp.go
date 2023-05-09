@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"net/netip"
 	"time"
 
 	"github.com/LanXuage/gscan/common"
@@ -11,24 +13,61 @@ import (
 )
 
 var (
-	icmpScanner = icmp.New()
+	icmpScanner = icmp.GetICMPScanner()
 	icmpCmd     = &cobra.Command{
 		Use:   "icmp",
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := common.GetLogger()
+			start := time.Now()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
 			icmpScanner.Timeout = time.Second * time.Duration(timeout)
-			host, _ := cmd.Flags().GetString("host")
-			logger.Debug("runE", zap.Any("host", host))
+
+			if hosts, err := cmd.Flags().GetStringArray("hosts"); err == nil {
+				fmt.Printf("IP\t\t\tStatus\n")
+				for _, host := range hosts {
+					if len(host) == 0 {
+						cmd.Help()
+						return nil
+					}
+					logger.Debug("runE", zap.Any("host", host))
+					if ip, err := netip.ParseAddr(host); err == nil {
+						logger.Debug("icmp", zap.Any("ip", ip))
+						ipList := []netip.Addr{}
+						ipList = append(ipList, ip)
+						timeoutCh := icmpScanner.ScanList(ipList)
+						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+					}
+					if prefix, err := netip.ParsePrefix(host); err == nil {
+						logger.Debug("runE", zap.Any("prefix", prefix))
+						timeoutCh := icmpScanner.ScanListByPrefix(prefix)
+						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+					}
+				}
+				fmt.Printf("Cost: %v\n", time.Since(start))
+			}
+
 			return nil
 		},
 	}
 )
 
+func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
+	for {
+		select {
+		case result := <-icmpScanner.ResultCh:
+			if result.IsActive {
+				fmt.Printf("%s\t\tAlive\n", result.IP)
+			}
+		case <-timeoutCh:
+			return
+		}
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(icmpCmd)
-	icmpCmd.Flags().StringP("host", "h", "", "host, domain or cidr to scan")
-	icmpCmd.Flags().BoolP("all", "a", false, "to scan all localnet")
+	icmpCmd.Flags().StringArrayP("hosts", "h", []string{}, "host, domain or cidr to scan")
+	icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
 }
