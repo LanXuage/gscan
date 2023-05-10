@@ -9,10 +9,12 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
+	mkdir -p #{DIRECTORY}
 	touch ${DIRECTORY}/gscan-windows-amd64.exe
 
 darwin:
 	echo "Compiling Darwin binary"
+	mkdir -p #{DIRECTORY}
 	touch ${DIRECTORY}/gscan-darwin-amd64
 
 linux:
