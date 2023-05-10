@@ -9,13 +9,14 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
-	env GOOS=windows GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}.exe cli/main.go
-	env GOOS=windows GOARCH=386 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}.exe cli/main.go
+	env GOOS=windows GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windwos-amd64.exe cli/main.go
+	env GOOS=windows GOARCH=386 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-386.exe cli/main.go
 
 darwin:
 	echo "Compiling Darwin binary"
-	env GOOS=darwin GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
-	env GOOS=darwin GOARCH=arm64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
+	brew install libpcap-dev
+	env GOOS=darwin GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
+	env GOOS=darwin GOARCH=arm64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
 linux:
 	echo "Compiling static Linux binary"
