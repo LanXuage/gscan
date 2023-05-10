@@ -16,7 +16,7 @@ darwin:
 	echo "Compiling Darwin binary"
 	brew install libpcap
 	env CGO_ENABLED=1 CC=clang CPP=clang++ GOOS=darwin GOARCH=amd64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
-	env CGO_ENABLED=1 CC=clang CPP=clang++  GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
+	env CGO_ENABLED=1 CC=clang CPP=clang++ GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib -arch arm64" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
 linux:
 	echo "Compiling static Linux binary"
