@@ -14,7 +14,7 @@ windows:
 
 darwin:
 	echo "Compiling Darwin binary"
-	brew install libpcap-dev
+	brew install libpcap
 	env GOOS=darwin GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
 	env GOOS=darwin GOARCH=arm64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
