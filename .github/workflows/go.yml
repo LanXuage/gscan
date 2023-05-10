@@ -44,8 +44,6 @@ jobs:
     needs: [build-linux, build-darwin, build-windows]
     steps:
       - 
-        run: ls -l bin/*
-      -
-        run: file bin/*
+        run: ls -l *
 
 
