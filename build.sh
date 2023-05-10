@@ -1,4 +1,12 @@
 #!/bin/sh
-# docker buildx build --platform "darwin/arm64,darwin/amd64,linux/386,linux/amd64,linux/arm64,linux/arm/v7,windows/386,windows/amd64" --output "./dist" --target "artifact" .
-docker buildx build --platform "linux/amd64" --output "./dist" --target "artifact" .
-
+set -ex
+sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+apk update
+apk add linux-headers musl-dev gcc go libpcap-dev ca-certificates git
+mkdir /go
+export GOPATH=/go
+go env -w GO111MODULE=on
+go env -w GOPROXY=https://goproxy.cn,direct
+cd /mnt
+go mod tidy
+env CGO_ENABLED=1 go build --ldflags "${LDFLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}${SUFFIX} cli/main.go
