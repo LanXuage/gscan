@@ -9,6 +9,7 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
+	ls
 
 darwin:
 	echo "Compiling Darwin binary"
