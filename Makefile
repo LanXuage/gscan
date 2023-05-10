@@ -14,6 +14,8 @@ windows:
 
 darwin:
 	echo "Compiling Darwin binary"
+	env GOOS=darwin GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
+	env GOOS=darwin GOARCH=arm64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
 
 linux:
 	echo "Compiling static Linux binary"
