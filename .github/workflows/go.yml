@@ -23,4 +23,19 @@ jobs:
       - 
         name: Build
         run: docker buildx build --platform "darwin/arm64,darwin/amd64,linux/386,linux/amd64,linux/arm64,linux/arm/v7,windows/386,windows/amd64" --output "./dist" --target "artifact" .
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: user/app:latest
+
 
