@@ -9,7 +9,8 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
-	ls
+	env GOOS=windows GOARCH=amd64 go build --ldflags "${WIN_FLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}.exe cli/main.go
+	env GOOS=windows GOARCH=386 go build --ldflags "${WIN_FLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}.exe cli/main.go
 
 darwin:
 	echo "Compiling Darwin binary"

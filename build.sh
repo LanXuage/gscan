@@ -7,4 +7,4 @@ export GOPATH=/go
 go env -w GO111MODULE=on
 cd /mnt
 go mod tidy
-env CGO_ENABLED=1 go build --ldflags "${LDFLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH}${SUFFIX} cli/main.go
+env CGO_ENABLED=1 go build --ldflags "${LDFLAGS}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
