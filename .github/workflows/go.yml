@@ -92,5 +92,13 @@ jobs:
           PYPI_API_USERNAME: ${{ secrets.PYPI_API_USERNAME }}
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: make wheel
+      - 
+        name: Release
+        uses: softprops/action-gh-release@v1
+        # if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: bin/gscan-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 

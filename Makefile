@@ -24,7 +24,7 @@ darwin:
 	env CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap-1.10.4/" CGO_CPPFLAGS="-I/usr/local/opt/libpcap-1.10.4/" go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
 linux:
-	echo "Compiling static Linux binary"
+	echo "Compiling Linux binary"
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=amd64 -e LDFLAGS_A=${LINUX_FLAGS} -iv $(PWD):/mnt amd64/alpine:3.18 /mnt/build.sh
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=386 -e LDFLAGS_A=${LINUX_FLAGS} -iv $(PWD):/mnt i386/alpine:3.18 /mnt/build.sh
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=arm64 -e LDFLAGS_A=${LINUX_FLAGS} -iv $(PWD):/mnt arm64v8/alpine:3.18 /mnt/build.sh
@@ -34,6 +34,8 @@ clean:
 	rm -rf ${DIRECTORY}
 
 wheel:
+	echo "Compiling wheel"
+	chmod +x bin/gscan-*
 	pip install wheel setuptools build twine
 	python -m build
 	python -m twine upload -u ${PYPI_API_USERNAME} -p ${PYPI_API_TOKEN} --verbose --skip-existing dist/*

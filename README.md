@@ -14,6 +14,7 @@
 - [ ] UDP port scan
 - [ ] Service discovery
 - [ ] Vulnerability discovery
+- [ ] Adaptive binary overflow
 
 # 使用
 
