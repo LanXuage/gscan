@@ -5,7 +5,7 @@ name: Build
 
 on:
   push:
-    branches: [ "feat-add-pip" ]
+    branches: [ "main" ]
 
 jobs:
   build-linux:
@@ -95,7 +95,7 @@ jobs:
       - 
         name: Release
         uses: softprops/action-gh-release@v1
-        # if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: bin/gscan-*
         env:
