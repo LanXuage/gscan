@@ -21,3 +21,13 @@
 go.work
 
 bin/
+
+# python
+.venv/
+.vscode/
+dist/
+*.egg-info/
+build/
+wheelhouse/
+__pycache__/
+*.pyc

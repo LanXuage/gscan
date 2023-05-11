@@ -1,25 +1,104 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go
+name: Build
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-
-  build:
+  build-linux:
+    name: build-linux
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build bin and push docker
+        run: make linux
+      - 
+        name: Upload linux bin
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: bin/
+  build-darwin:
+    name: build-darwin
+    runs-on: macos-latest
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Build by make
+        run: make darwin
+      - 
+        name: Upload darwin bin
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: bin/
+  build-windows:
+    name: build-windows
+    runs-on: windows-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Build by make
+        run: make windows
+      - 
+        name: Upload windows bin
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: bin/
+  build-wheel:
+    name: build-wheel
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-darwin, build-windows]
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@v3
+      - 
+        uses: actions/download-artifact@v3
+        with:
+          name: bin
+          path: bin/
+      - 
+        name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+      -
+        name: Build by make
+        env:
+          PYPI_API_USERNAME: ${{ secrets.PYPI_API_USERNAME }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: make wheel
+      - 
+        name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: bin/gscan-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19
 
-    - name: Test
-      run: go test -v ./...
