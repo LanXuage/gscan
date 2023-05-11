@@ -10,18 +10,18 @@ create-directory:
 
 windows:
 	echo "Compiling Windows binary"
-	env GOOS=windows GOARCH=amd64 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-amd64.exe cli/main.go
-	env GOOS=windows GOARCH=386 go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-386.exe cli/main.go
+	env GOOS=windows GOARCH=amd64 go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-amd64.exe cli/main.go
+	env GOOS=windows GOARCH=386 go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-386.exe cli/main.go
 
 darwin:
 	echo "Compiling Darwin binary"
 	brew install libpcap
-	env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
+	env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
 	wget https://www.tcpdump.org/release/libpcap-1.10.4.tar.gz -O /usr/local/opt/libpcap-1.10.4.tar.gz
 	tar zxvf /usr/local/opt/libpcap-1.10.4.tar.gz -C /usr/local/opt/
 	cd /usr/local/opt/libpcap-1.10.4/ && CC=clang CFLAGS='-target arm64-apple-macos -arch arm64' ./configure --host arm64-apple-macos && make
 	cd /Users/runner/work/gscan/gscan
-	env CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap-1.10.4/" CGO_CPPFLAGS="-I/usr/local/opt/libpcap-1.10.4/" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
+	env CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap-1.10.4/" CGO_CPPFLAGS="-I/usr/local/opt/libpcap-1.10.4/" go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
 linux:
 	echo "Compiling static Linux binary"
@@ -36,4 +36,4 @@ clean:
 wheel:
 	pip install wheel setuptools build twine
 	python -m build
-	python -m twine upload -u ${PYPI_API_USERNAME} -p ${PYPI_API_TOKEN} --skip-existing dist/*
+	python -m twine upload -u ${PYPI_API_USERNAME} -p ${PYPI_API_TOKEN} --verbose --skip-existing dist/*

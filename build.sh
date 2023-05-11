@@ -10,4 +10,4 @@ wget https://www.tcpdump.org/release/libpcap-1.10.4.tar.gz -O /opt/libpcap-1.10.
 tar zxvf /opt/libpcap-1.10.4.tar.gz -C /opt/
 cd /opt/libpcap-1.10.4/ && ./configure && make
 cd /mnt && go mod tidy
-env CGO_ENABLED=1 CGO_LDFLAGS="-L/opt/libpcap-1.10.4" CGO_CPPFLAGS="-I/opt/libpcap-1.10.4" go build --ldflags "${LDFLAGS_A}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
+env CGO_ENABLED=1 CGO_LDFLAGS="-L/opt/libpcap-1.10.4" CGO_CPPFLAGS="-I/opt/libpcap-1.10.4" go build -v -x --ldflags "${LDFLAGS_A}" -o ${DIRECTORY}/gscan-${GOOS}-${GOARCH} cli/main.go
