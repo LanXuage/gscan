@@ -36,5 +36,4 @@ clean:
 wheel:
 	pip install wheel setuptools build twine
 	python -m build
-	python -m twine 
 	python -m twine upload -u ${PYPI_API_USERNAME} -p ${PYPI_API_TOKEN} --skip-existing dist/*
