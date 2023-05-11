@@ -19,7 +19,7 @@ darwin:
 	env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
 	wget https://www.tcpdump.org/release/libpcap-1.10.4.tar.gz -O /usr/local/opt/libpcap-1.10.4.tar.gz
 	tar zxvf /usr/local/opt/libpcap-1.10.4.tar.gz -C /usr/local/opt/
-	cd /usr/local/opt/libpcap-1.10.4/ && CC=clang ./configure --host arm64-apple-macos && make
+	cd /usr/local/opt/libpcap-1.10.4/ && CC=clang CFLAGS='-target arm64-apple-macos -arch arm64' ./configure --host arm64-apple-macos && make
 	env CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap-1.10.4/" CGO_CPPFLAGS="-I/usr/local/opt/libpcap-1.10.4/" go build --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
 linux:
