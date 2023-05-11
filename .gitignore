@@ -29,3 +29,5 @@ dist/
 *.egg-info/
 build/
 wheelhouse/
+__pycache__/
+*.pyc
