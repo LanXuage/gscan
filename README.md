@@ -1,3 +1,5 @@
+![GitHub language count](https://img.shields.io/github/languages/count/lanxuage/gscan) ![GitHub top language](https://img.shields.io/github/languages/top/lanxuage/gscan) ![GitHub Repo stars](https://img.shields.io/github/stars/lanxuage/gscan?style=social) ![Docker Image Version (latest by date)](https://img.shields.io/docker/v/lanxuage/gscan) ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/lanxuage/gscan) ![Docker Stars](https://img.shields.io/docker/stars/lanxuage/gscan) ![piwheels](https://img.shields.io/piwheels/v/gscan) ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/lanxuage/gscan) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ab59c36bb65c409fa547c137bd3ae825)](https://app.codacy.com/gh/LanXuage/gscan/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) ![Discord](https://img.shields.io/discord/1106210931333156976) ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/lanxuage/gscan) ![GitHub all releases](https://img.shields.io/github/downloads/lanxuage/gscan/total) ![GitHub issues](https://img.shields.io/github/issues/lanxuage/gscan) ![GitHub](https://img.shields.io/github/license/lanxuage/gscan) ![GitHub last commit](https://img.shields.io/github/last-commit/lanxuage/gscan)
+
 [English](README_EN.md)
 
 # 介绍
@@ -6,10 +8,10 @@
 
 # 特性
 
-- [x] ~~ARP scan~~
+- [x] ARP scan
 - [x] ICMP scan
-- [x] ~~TCP port scan~~
-- [x] ~~Domain support~~
+- [x] TCP port scan
+- [x] Domain support
 - [ ] Random port support
 - [ ] UDP port scan
 - [ ] Service discovery
