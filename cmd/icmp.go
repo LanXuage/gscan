@@ -13,22 +13,26 @@ import (
 )
 
 var (
-	icmpScanner = icmp.GetICMPScanner()
-	icmpCmd     = &cobra.Command{
+	icmpCmd = &cobra.Command{
 		Use:   "icmp",
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			icmpScanner := icmp.GetICMPScanner()
+			defer icmpScanner.Close()
 			logger := common.GetLogger()
 			start := time.Now()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			icmpScanner.Timeout = time.Second * time.Duration(timeout)
+			icmpScanner.Timeout = time.Millisecond * time.Duration(timeout)
 
 			if hosts, err := cmd.Flags().GetStringArray("hosts"); err == nil {
+				if len(hosts) == 0 {
+					cmd.Help()
+					return nil
+				}
 				fmt.Printf("IP\t\t\tStatus\n")
 				for _, host := range hosts {
 					if len(host) == 0 {
-						cmd.Help()
 						return nil
 					}
 					logger.Debug("runE", zap.Any("host", host))
@@ -44,6 +48,11 @@ var (
 						timeoutCh := icmpScanner.ScanListByPrefix(prefix)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
+					if ips, err := ParseAddr(host); err == nil {
+						logger.Debug("runE", zap.Any("ips", ips))
+						timeoutCh := icmpScanner.ScanList(ips)
+						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+					}
 				}
 				fmt.Printf("Cost: %v\n", time.Since(start))
 			}
@@ -56,7 +65,7 @@ var (
 func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 	for {
 		select {
-		case result := <-icmpScanner.ResultCh:
+		case result := <-resultCh:
 			if result.IsActive {
 				fmt.Printf("%s\t\tAlive\n", result.IP)
 			}
@@ -69,5 +78,5 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 func init() {
 	rootCmd.AddCommand(icmpCmd)
 	icmpCmd.Flags().StringArrayP("hosts", "h", []string{}, "host, domain or cidr to scan")
-	icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
+	// icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
 }

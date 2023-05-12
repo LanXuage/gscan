@@ -50,4 +50,5 @@ func init() {
 	rootCmd.PersistentFlags().StringP("file", "F", "", "file to output(unrealized)")
 	rootCmd.PersistentFlags().BoolVarP(&withARP, "arp", "A", false, "with arp scan")
 	rootCmd.PersistentFlags().BoolVarP(&withICMP, "icmp", "I", false, "with icmp scan")
+	// rootCmd.PersistentFlags().StringP("proxy", "P", "", "support http, https, socks4, socks5")
 }
