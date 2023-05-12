@@ -20,12 +20,10 @@ type ARPScanner struct {
 	Opts    gopacket.SerializeOptions // 包序列化选项
 	Timeout time.Duration             // 抓包超时时间
 	// Deprecated: Use Ifas instead.
-	Ifaces *[]common.GSInterface // 可用接口列表
-	Ifas   *[]common.GSIface     // 可用接口列表
-	// Deprecated: Use AHMap instead.
-	AMap     cmap.ConcurrentMap[uint32, *net.HardwareAddr]    // 获取到的IP <-> Mac 映射表
+	Ifaces   *[]common.GSInterface                            // 可用接口列表
+	Ifas     *[]common.GSIface                                // 可用接口列表
 	AHMap    cmap.ConcurrentMap[netip.Addr, net.HardwareAddr] // 获取到的IP <-> Mac 映射表
-	OMap     map[string]string                                // Mac前缀 <-> 厂商 映射表
+	OMap     sync.Map                                         // Mac前缀 <-> 厂商 映射表
 	Lock     sync.Mutex
 	TargetCh chan *Target
 	ResultCh chan *ARPScanResult
@@ -43,16 +41,27 @@ func (a *ARPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GS
 		for {
 			if (nIP.Is4() && nIP.AsSlice()[3] != 0 && nIP.AsSlice()[3] != 255) || (nIP.Is6() && nIP.AsSlice()[15] != 0 && (nIP.AsSlice()[14] != 255 || nIP.AsSlice()[15] != 255)) {
 				if iface.Gateway == nIP {
-					prefix1, prefix2 := common.GetOuiPrefix(iface.HWAddr)
-					vendor := a.OMap[prefix2]
-					if len(vendor) == 0 {
-						vendor = a.OMap[prefix1]
-					}
-					gh, _ := a.AHMap.Get(iface.Gateway)
-					a.ResultCh <- &ARPScanResult{
-						IP:     nIP,
-						Mac:    gh,
-						Vendor: vendor,
+					if gh, ok := a.AHMap.Get(iface.Gateway); ok {
+						prefix1, prefix2 := common.GetOuiPrefix(iface.HWAddr)
+						vendor, ok := a.OMap.Load(prefix2)
+						if !ok {
+							if vendor, ok = a.OMap.Load(prefix1); !ok {
+								vendor = ""
+							}
+						}
+						logger.Debug("generateTargetByPrefix", zap.Any("ret->mac", gh))
+						a.ResultCh <- &ARPScanResult{
+							IP:     nIP,
+							Mac:    gh,
+							Vendor: vendor.(string),
+						}
+					} else {
+						a.TargetCh <- &Target{
+							SrcMac: iface.HWAddr,
+							SrcIP:  iface.IP,
+							DstIP:  nIP,
+							Handle: iface.Handle,
+						}
 					}
 				} else if !nIP.IsValid() || !prefix.Contains(nIP) || !iface.Mask.Contains(nIP) {
 					break
@@ -105,18 +114,24 @@ func (a *ARPScanner) goScanMany(ips []netip.Addr, timeoutCh chan struct{}) {
 		for _, iface := range *a.Ifas {
 			logger.Debug("so", zap.Any("ip", iface.Gateway))
 			if iface.Gateway == ip {
-				prefix1, prefix2 := common.GetOuiPrefix(iface.HWAddr)
-				vendor := a.OMap[prefix2]
-				if len(vendor) == 0 {
-					vendor = a.OMap[prefix1]
+				if gh, ok := a.AHMap.Get(iface.Gateway); ok {
+					prefix1, prefix2 := common.GetOuiPrefix(iface.HWAddr)
+					vendor, ok := a.OMap.Load(prefix2)
+					if !ok {
+						if vendor, ok = a.OMap.Load(prefix1); !ok {
+							vendor = ""
+						}
+					}
+					logger.Debug("goScanMany", zap.Any("ret->mac", gh))
+					a.ResultCh <- &ARPScanResult{
+						IP:     ip,
+						Mac:    gh,
+						Vendor: vendor.(string),
+					}
+					continue
 				}
-				gh, _ := a.AHMap.Get(iface.Gateway)
-				a.ResultCh <- &ARPScanResult{
-					IP:     ip,
-					Mac:    gh,
-					Vendor: vendor,
-				}
-			} else if iface.Mask.Contains(ip) {
+			}
+			if iface.Mask.Contains(ip) {
 				a.TargetCh <- &Target{
 					SrcMac: iface.HWAddr,
 					SrcIP:  iface.IP,
@@ -230,20 +245,20 @@ func (a *ARPScanner) RecvARP(packet gopacket.Packet) interface{} {
 }
 
 func (a *ARPScanner) generateResult(srcIP netip.Addr, srcMac net.HardwareAddr) (*ARPScanResult, bool) {
-	srcIPU32 := common.IP2Uint32(srcIP.AsSlice())
-	if _, ok := a.AHMap.Get(srcIP); !ok {
+	if a.AHMap.SetIfAbsent(srcIP, srcMac) {
 		prefix1, prefix2 := common.GetOuiPrefix(srcMac)
-		vendor := a.OMap[prefix2]
-		if len(vendor) == 0 {
-			vendor = a.OMap[prefix1]
+		vendor, ok := a.OMap.Load(prefix2)
+		if !ok {
+			if vendor, ok = a.OMap.Load(prefix1); !ok {
+				vendor = ""
+			}
 		}
+		logger.Debug("generateResult", zap.Any("ret->mac", srcMac))
 		result := &ARPScanResult{
 			IP:     srcIP,
 			Mac:    srcMac,
-			Vendor: vendor,
+			Vendor: vendor.(string),
 		}
-		a.AMap.Set(srcIPU32, &srcMac)
-		a.AHMap.Set(srcIP, srcMac)
 		return result, true
 	}
 	return nil, false

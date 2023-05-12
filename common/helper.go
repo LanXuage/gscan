@@ -46,6 +46,7 @@ func ToJSON(data interface{}) string {
 	return out.String()
 }
 
+// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
 func IP2Uint32(ip net.IP) uint32 {
 	var sum uint32
 	if len(ip) < 4 {
@@ -58,14 +59,17 @@ func IP2Uint32(ip net.IP) uint32 {
 	return sum + uint32(ip[3])
 }
 
+// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
 func IPMask2Uint32(mask net.IPMask) uint32 {
 	return IP2Uint32(net.IP(mask))
 }
 
+// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
 func Uint322IP(ipUint32 uint32) net.IP {
 	return net.IPv4(byte((ipUint32>>24)&0xff), byte((ipUint32>>16)&0xff), byte((ipUint32>>8)&0xff), byte(ipUint32&0xff))
 }
 
+// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
 func IsSameLAN(ip net.IP, otherIp net.IP, mask uint32) bool {
 	return IP2Uint32(ip)&mask == IP2Uint32(otherIp)&mask
 }
@@ -86,15 +90,6 @@ func GetHandle(deviceName string) *pcap.Handle {
 		logger.Error("Get Handle failed", zap.String("deviceName", deviceName), zap.Error(err))
 	}
 	return handle
-}
-
-// Deprecated: use IPList2NetIPList instead
-func _IPList2NetIPList(ipList []string) []net.IP {
-	s := []net.IP{}
-	for _, ip := range ipList {
-		s = append(s, net.ParseIP(ip).To4())
-	}
-	return s
 }
 
 func IPList2NetIPList(ipList []string) []netip.Addr {

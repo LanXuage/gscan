@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// @De
+// Deprecated: Use GSIface instead.
 type GSInterface struct {
 	Name    string           // 接口名称
 	Gateway net.IP           // 接口网关IP

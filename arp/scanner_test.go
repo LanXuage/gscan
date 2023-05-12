@@ -16,5 +16,5 @@ func Test_ARPScanner(t *testing.T) {
 		}
 	}()
 	time.Sleep(5 * time.Second)
-	t.Log(a.AMap.Items())
+	t.Log(a.AHMap.Items())
 }
