@@ -73,6 +73,8 @@ jobs:
   build-wheel:
     name: build-wheel
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: [build-linux, build-darwin, build-windows]
     steps:
       - 
