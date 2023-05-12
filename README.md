@@ -4,14 +4,14 @@
 
 # 介绍
 
-`gscan`最初是为项目[gosam](https://github.com/LanXuage/gosam.git)提供基础扫描支持的。后来独立出来成为一个类似`nmap`的扫描工具，目前正在努力加强和完善中，项目很期待其他开发者的加入。也欢迎您下载[发布包](https://github.com/LanXuage/gosam/releases)来体验它，帮我们测试并反馈问题给我们。
+`gscan`最初是为项目[gosam](https://github.com/LanXuage/gosam.git)提供基础扫描支持的。后来独立出来成为一个类似 `nmap`的扫描工具，目前正在努力加强和完善中，项目很期待其他开发者的加入。也欢迎您下载[发布包](https://github.com/LanXuage/gscan/releases)来体验它，帮我们测试并反馈问题给我们。
 
 # 特性
 
-- [x] ARP scan
-- [x] ICMP scan
-- [x] TCP port scan
-- [x] Domain support
+- [X] ARP scan
+- [X] ICMP scan
+- [X] TCP port scan
+- [X] Domain support
 - [ ] Random port support
 - [ ] UDP port scan
 - [ ] Service discovery
@@ -20,7 +20,7 @@
 
 # 使用
 
-从[发布包](https://github.com/LanXuage/gosam/releases)里下载的对应系统和架构的可执行文件`gscan`。
+从[发布包](https://github.com/LanXuage/gscan/releases)里下载的对应系统和架构的可执行文件 `gscan`。
 
 ## 查看帮助
 
@@ -59,6 +59,7 @@ Flags:
 
 Use "gscan [command] --help" for more information about a command.
 ```
+
 详细命令作用参考[这里](doc/command.md)。
 
 ## 简单例子
@@ -82,7 +83,7 @@ $ gscan arp -h 192.168.50.179
 Cost: 6.500702247s
 ```
 
-> 注意：默认超时为6500毫秒，可以使用`-T`进行指定，单位为毫秒。
+> 注意：默认超时为6500毫秒，可以使用 `-T`进行指定，单位为毫秒。
 
 ### ICMP 扫描
 
@@ -105,7 +106,6 @@ IP              Status
 Cost: 4.002214791s
 
 ```
-
 
 ### TCP Port 扫描
 
@@ -156,7 +156,7 @@ IP                                      MAC                     VENDOR          
 Cost: 9.01656839s
 ```
 
-> 注意：`gscan`使用的是`gopacket`模拟的全连接，所以使用`-f`参数时应该开启本地的防火墙，防止本机系统自动`rst`连接导致全连接扫描失败。
+> 注意：`gscan`使用的是 `gopacket`模拟的全连接，所以使用 `-f`参数时应该开启本地的防火墙，防止本机系统自动 `rst`连接导致全连接扫描失败。
 
 # 开发
 
@@ -188,7 +188,7 @@ git clone https://github.com/LanXuage/gscan.git
 make linux
 ```
 
-编译完成会在项目目录下的`bin`目录生不同架构的`linux`静态可执行文件。
+编译完成会在项目目录下的 `bin`目录生不同架构的 `linux`静态可执行文件。
 
 ## 开发规范
 

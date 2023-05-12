@@ -1,7 +1,7 @@
 DIRECTORY=bin
 LINUX_FLAGS='-linkmode external -extldflags "-static -s -w"'
 WIN_FLAGS='-extldflags "-s -w"'
-VERSION=0.2.1
+VERSION=0.2.2
 
 all: clean create-directory windows linux darwin
 
