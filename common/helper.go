@@ -48,6 +48,10 @@ func ToJSON(data interface{}) string {
 
 func IP2Uint32(ip net.IP) uint32 {
 	var sum uint32
+	if len(ip) < 4 {
+		logger.Error("IP2Uint32", zap.Any("ip", ip), zap.Int("len", len(ip)))
+		logger.Panic("invailed IPv4")
+	}
 	sum += uint32(ip[0]) << 24
 	sum += uint32(ip[1]) << 16
 	sum += uint32(ip[2]) << 8

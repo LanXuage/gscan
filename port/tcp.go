@@ -156,14 +156,13 @@ func (t *TCPScanner) SendSYNACK(target *TCPTarget) {
 				Window:  502,
 				Padding: []byte{0},
 			}
-
 		}
 		if err := tcpLayer.SetNetworkLayerForChecksum(ipLayer); err != nil {
 			logger.Error("SetNetwordLayerForChecksum Failed", zap.Error(err))
 		}
 		buffer := gopacket.NewSerializeBuffer()
 		if err := gopacket.SerializeLayers(buffer, t.Opts, ethLayer, ipLayer, tcpLayer); err != nil {
-			logger.Error("SerializeLayers Failed", zap.Error(err))
+			logger.Error("SerializeLayers Failed", zap.Error(err), zap.Any("target", target))
 		}
 		data := buffer.Bytes()
 		if err := target.Handle.WritePacketData(data); err != nil {
@@ -214,6 +213,9 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 	dstMac, _ := arpInstance.AHMap.Get(iface.Gateway)
 	if ip == iface.IP {
 		dstMac = iface.HWAddr
+	}
+	if len(dstMac) == 0 {
+		return
 	}
 	dstPorts := common.GetDefaultPorts()
 	if t.PortScanType == ALL_PORTS {

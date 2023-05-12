@@ -76,7 +76,18 @@ func getRoutes() []RouteRow {
 // Deprecated: Use common.Gways instead.
 func GetGateways() []net.IP {
 	ret := []net.IP{}
+L1:
 	for _, r := range getRoutes() {
+		ip := netip.AddrFrom4(r.ForwardNextHop)
+		if ip == localhost {
+			continue
+		}
+		for _, addr := range ret {
+			addr_i, _ := netip.AddrFromSlice(addr)
+			if addr_i == ip {
+				continue L1
+			}
+		}
 		ret = append(ret, net.IPv4(r.ForwardNextHop[0], r.ForwardNextHop[1], r.ForwardNextHop[2], r.ForwardNextHop[3]))
 	}
 	return ret
