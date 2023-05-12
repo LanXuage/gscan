@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	icmpScanner = icmp.GetICMPScanner()
-	icmpCmd     = &cobra.Command{
+	icmpCmd = &cobra.Command{
 		Use:   "icmp",
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			icmpScanner := icmp.GetICMPScanner()
 			defer icmpScanner.Close()
 			logger := common.GetLogger()
 			start := time.Now()
@@ -65,7 +65,7 @@ var (
 func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 	for {
 		select {
-		case result := <-icmpScanner.ResultCh:
+		case result := <-resultCh:
 			if result.IsActive {
 				fmt.Printf("%s\t\tAlive\n", result.IP)
 			}
@@ -78,5 +78,5 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 func init() {
 	rootCmd.AddCommand(icmpCmd)
 	icmpCmd.Flags().StringArrayP("hosts", "h", []string{}, "host, domain or cidr to scan")
-	icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
+	// icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
 }
