@@ -83,8 +83,8 @@ L1:
 			continue
 		}
 		for _, addr := range ret {
-			addr_i, _ := netip.AddrFromSlice(addr)
-			if addr_i == ip {
+			addrI, _ := netip.AddrFromSlice(addr)
+			if addrI == ip {
 				continue L1
 			}
 		}
