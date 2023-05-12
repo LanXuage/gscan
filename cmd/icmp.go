@@ -18,17 +18,21 @@ var (
 		Use:   "icmp",
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer icmpScanner.Close()
 			logger := common.GetLogger()
 			start := time.Now()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			icmpScanner.Timeout = time.Second * time.Duration(timeout)
+			icmpScanner.Timeout = time.Millisecond * time.Duration(timeout)
 
 			if hosts, err := cmd.Flags().GetStringArray("hosts"); err == nil {
+				if len(hosts) == 0 {
+					cmd.Help()
+					return nil
+				}
 				fmt.Printf("IP\t\t\tStatus\n")
 				for _, host := range hosts {
 					if len(host) == 0 {
-						cmd.Help()
 						return nil
 					}
 					logger.Debug("runE", zap.Any("host", host))
@@ -42,6 +46,11 @@ var (
 					if prefix, err := netip.ParsePrefix(host); err == nil {
 						logger.Debug("runE", zap.Any("prefix", prefix))
 						timeoutCh := icmpScanner.ScanListByPrefix(prefix)
+						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+					}
+					if ips, err := ParseAddr(host); err == nil {
+						logger.Debug("runE", zap.Any("ips", ips))
+						timeoutCh := icmpScanner.ScanList(ips)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 				}
