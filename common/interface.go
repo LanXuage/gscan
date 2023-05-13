@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// @De
+// Deprecated: Use GSIface instead.
 type GSInterface struct {
 	Name    string           // 接口名称
 	Gateway net.IP           // 接口网关IP
@@ -30,24 +30,37 @@ type GSIface struct {
 
 var localhost, _ = netip.ParseAddr("127.0.0.1")
 
-func getActiveInterfaces() *[]GSInterface {
-	gsInterfaces := make([]GSInterface, 0)
-	gateways := GetGateways()
+func getPcapDevs() []pcap.Interface {
 	devs, err := pcap.FindAllDevs()
 	if err != nil {
 		logger.Error("FindAllDevs failed", zap.Error(err))
+		return []pcap.Interface{}
 	}
+	return devs
+}
+
+var devs = getPcapDevs()
+
+func getActiveInterfaces() *[]GSInterface {
+	gsInterfaces := make([]GSInterface, 0)
+	gateways := GetGateways()
 	ifs, err := net.Interfaces()
 	if err != nil {
 		logger.Error("Net Interfaces failed", zap.Error(err))
 	}
+	logger.Debug("getActiveInterfaces", zap.Any("gateways", gateways))
 	for _, gateway := range gateways {
 		for _, dev := range devs {
 			if dev.Addresses == nil {
 				continue
 			}
 			for _, addr := range dev.Addresses {
+				logger.Debug("getActiveInterfaces", zap.Any("addr", addr))
 				if addr.IP == nil {
+					continue
+				}
+				// skip IPv6
+				if addr.Netmask == nil {
 					continue
 				}
 				maskUint32 := IPMask2Uint32(addr.Netmask)
@@ -78,10 +91,6 @@ func getActiveInterfaces() *[]GSInterface {
 func getActiveIfaces() *[]GSIface {
 	gsInterfaces := make([]GSIface, 0)
 	gateways := Gways()
-	devs, err := pcap.FindAllDevs()
-	if err != nil {
-		logger.Error("FindAllDevs failed", zap.Error(err))
-	}
 	ifs, err := net.Interfaces()
 	if err != nil {
 		logger.Error("Net Interfaces failed", zap.Error(err))

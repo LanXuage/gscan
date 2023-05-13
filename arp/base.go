@@ -49,7 +49,6 @@ func newARPScanner() *ARPScanner {
 		},
 		Timeout:  3 * time.Second,
 		OMap:     common.GetOui(),
-		AMap:     cmap.NewWithCustomShardingFunction[uint32, *net.HardwareAddr](func(key uint32) uint32 { return key }),
 		AHMap:    cmap.NewWithCustomShardingFunction[netip.Addr, net.HardwareAddr](common.Fnv32),
 		Ifaces:   common.GetActiveInterfaces(),
 		Ifas:     common.GetActiveIfaces(),
