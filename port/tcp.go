@@ -257,6 +257,9 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 	if ip == iface.IP {
 		dstMac = iface.HWAddr
 	}
+	if len(dstMac) == 0 {
+		return
+	}
 	dstPorts := common.GetDefaultPorts()
 	if t.PortScanType == ALL_PORTS {
 		dstPorts = &[]layers.TCPPort{}

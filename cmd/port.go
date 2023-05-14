@@ -105,13 +105,13 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 		case result := <-resultCh:
 			fmt.Printf("%-39s ", result.IP)
 			if withARP {
-				vendor := ""
+				var vendor any = ""
 				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
 				if ok {
 					prefix1, prefix2 := common.GetOuiPrefix(h)
-					vendor = arp.GetARPScanner().OMap[prefix2]
-					if len(vendor) == 0 {
-						vendor = arp.GetARPScanner().OMap[prefix1]
+					vendor, ok = arp.GetARPScanner().OMap.Load(prefix2)
+					if !ok {
+						vendor, _ = arp.GetARPScanner().OMap.Load(prefix1)
 					}
 				} else {
 					h = net.HardwareAddr{}
