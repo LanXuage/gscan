@@ -25,6 +25,7 @@ type TCPScanner struct {
 	Ports        []layers.TCPPort
 	gCount       int64
 	sCount       int64
+	UseRandom    bool
 }
 
 func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
@@ -111,70 +112,111 @@ func (t *TCPScanner) SendSYNACK(target *TCPTarget) {
 		DstIP:    target.DstIP,
 		Flags:    layers.IPv4DontFragment,
 	}
-	for _, dstPort := range *target.DstPorts {
-		var tcpLayer *layers.TCP
-		if target.Ack == 0 {
-			tcpLayer = &layers.TCP{
-				SrcPort: t.SrcPort,
-				DstPort: dstPort,
-				Seq:     100,
-				SYN:     true,
-				Window:  64240,
-				Options: []layers.TCPOption{
-					{
-						OptionType:   layers.TCPOptionKindMSS,
-						OptionLength: 4,
-						OptionData:   []byte{5, 0xb4},
-					},
-					{
-						OptionType: layers.TCPOptionKindNop,
-					},
-					{
-						OptionType: layers.TCPOptionKindNop,
-					},
-					{
-						OptionType:   layers.TCPOptionKindSACKPermitted,
-						OptionLength: 2,
-					},
-					{
-						OptionType: layers.TCPOptionKindNop,
-					},
-					{
-						OptionType:   layers.TCPOptionKindWindowScale,
-						OptionLength: 3,
-						OptionData:   []byte{7},
-					},
-				},
+	if t.UseRandom {
+		dstPortsCount := len(*target.DstPorts)
+		chLen := dstPortsCount / 8
+		if chLen < 10 {
+			chLen = 10
+		}
+		randAreaCh := make(chan RandArea, chLen)
+		randAreaCh <- [2]int{0, dstPortsCount}
+		for randArea := range randAreaCh {
+			randIndex := randArea[0] + rand.Intn(randArea[1]-randArea[0])
+			t.generateTCPLayerAndSend(target, (*target.DstPorts)[randIndex], ethLayer, ipLayer)
+			dstPortsCount -= 1
+			logger.Debug("sendSynAck", zap.Any("dstPortCount", dstPortsCount))
+			if dstPortsCount == 0 {
+				close(randAreaCh)
 			}
-		} else {
-			tcpLayer = &layers.TCP{
-				SrcPort: t.SrcPort,
-				DstPort: dstPort,
-				Seq:     101,
-				Ack:     target.Ack,
-				ACK:     true,
-				Window:  502,
-				Padding: []byte{0},
+			if randArea[1]-randIndex+1 > randIndex-randArea[0] {
+				if randArea[0] < randIndex {
+					randAreaCh <- [2]int{randArea[0], randIndex}
+				}
+				if randIndex+1 < randArea[1] {
+					randAreaCh <- [2]int{randIndex + 1, randArea[1]}
+				}
+			} else {
+				if randIndex+1 < randArea[1] {
+					randAreaCh <- [2]int{randIndex + 1, randArea[1]}
+				}
+				if randArea[0] < randIndex {
+					randAreaCh <- [2]int{randArea[0], randIndex}
+				}
 			}
-
 		}
-		if err := tcpLayer.SetNetworkLayerForChecksum(ipLayer); err != nil {
-			logger.Error("SetNetwordLayerForChecksum Failed", zap.Error(err))
+	} else {
+		for _, dstPort := range *target.DstPorts {
+			t.generateTCPLayerAndSend(target, dstPort, ethLayer, ipLayer)
 		}
-		buffer := gopacket.NewSerializeBuffer()
-		if err := gopacket.SerializeLayers(buffer, t.Opts, ethLayer, ipLayer, tcpLayer); err != nil {
-			logger.Error("SerializeLayers Failed", zap.Error(err))
-		}
-		data := buffer.Bytes()
-		if err := target.Handle.WritePacketData(data); err != nil {
-			logger.Error("WritePacketData Failed", zap.Error(err))
-		}
-		time.Sleep(time.Microsecond * 1002)
 	}
+}
+
+func (t *TCPScanner) generateTCPLayerAndSend(target *TCPTarget, dstPort layers.TCPPort, ethLayer *layers.Ethernet, ipLayer *layers.IPv4) {
+	var tcpLayer *layers.TCP
+	if target.Ack == 0 {
+		tcpLayer = &layers.TCP{
+			SrcPort: t.SrcPort,
+			DstPort: dstPort,
+			Seq:     100,
+			SYN:     true,
+			Window:  64240,
+			Options: []layers.TCPOption{
+				{
+					OptionType:   layers.TCPOptionKindMSS,
+					OptionLength: 4,
+					OptionData:   []byte{5, 0xb4},
+				},
+				{
+					OptionType: layers.TCPOptionKindNop,
+				},
+				{
+					OptionType: layers.TCPOptionKindNop,
+				},
+				{
+					OptionType:   layers.TCPOptionKindSACKPermitted,
+					OptionLength: 2,
+				},
+				{
+					OptionType: layers.TCPOptionKindNop,
+				},
+				{
+					OptionType:   layers.TCPOptionKindWindowScale,
+					OptionLength: 3,
+					OptionData:   []byte{7},
+				},
+			},
+		}
+	} else {
+		tcpLayer = &layers.TCP{
+			SrcPort: t.SrcPort,
+			DstPort: dstPort,
+			Seq:     101,
+			Ack:     target.Ack,
+			ACK:     true,
+			Window:  502,
+			Padding: []byte{0},
+		}
+	}
+	if err := tcpLayer.SetNetworkLayerForChecksum(ipLayer); err != nil {
+		logger.Error("SetNetwordLayerForChecksum Failed", zap.Error(err))
+	}
+	buffer := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buffer, t.Opts, ethLayer, ipLayer, tcpLayer); err != nil {
+		logger.Error("SerializeLayers Failed", zap.Error(err))
+	}
+	data := buffer.Bytes()
+	if err := target.Handle.WritePacketData(data); err != nil {
+		logger.Error("WritePacketData Failed", zap.Error(err))
+	}
+	time.Sleep(time.Microsecond * 1002)
 }
 
 func (t *TCPScanner) Scan() {
 	for target := range t.TargetCh {
+		if t.UseRandom && rand.Intn(2) == 0 {
+			t.TargetCh <- target
+			continue
+		}
 		t.SendSYNACK(target)
 		t.sCount += 1
 	}
@@ -298,6 +340,7 @@ func newTCPScanner() *TCPScanner {
 		UseFullTCP:   false,
 		PortScanType: DEFAULT_PORTS,
 		Ports:        []layers.TCPPort{},
+		UseRandom:    true,
 	}
 	go t.Recv()
 	go t.Scan()

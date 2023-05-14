@@ -37,6 +37,8 @@ type TCPTarget struct {
 	Handle   *pcap.Handle
 }
 
+type RandArea [2]int
+
 var tcpInstance = newTCPScanner()
 
 func GetTCPScanner() *TCPScanner {
