@@ -12,7 +12,7 @@
 - [X] ICMP scan
 - [X] TCP port scan
 - [X] Domain support
-- [ ] Random port support
+- [X] Random port support
 - [ ] UDP port scan
 - [ ] Service discovery
 - [ ] Vulnerability discovery
