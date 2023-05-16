@@ -1,7 +1,7 @@
 DIRECTORY=bin
 LINUX_FLAGS='-linkmode external -extldflags "-static -s -w"'
 WIN_FLAGS='-extldflags "-s -w"'
-VERSION=${RELEASE_VERSION}
+VERSION=$(subst refs/tags/,,${RELEASE_VERSION})
 PLATFORM=linux
 
 .PHONY: all create-directory init-version windows darwin linux clean wheel help
