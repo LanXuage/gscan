@@ -27,3 +27,15 @@ linux:
 	
 clean:
 	rm -rf ${DIRECTORY}
+
+test:
+PLATFORM=linux
+echo $(shell uname)
+ifeq ($(shell uname),Darwin)
+	PLATFORM=darwin
+else
+	ifeq ($(OS),Windows)
+		PLATFORM=windows
+	endif
+endif
+	echo ${PLATFORM}
