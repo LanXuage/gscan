@@ -19,6 +19,18 @@
 
 从[发布包](https://github.com/LanXuage/gosam/releases)里下载的对应系统和架构的可执行文件`gscan`。
 
+### Mac解决无法打开的问题
+
+Mac上会提示无法打开“xxxx”，因为Apple无法检查其是否包含恶意软件
+
+![image-20230516104345710](img/image-20230516104345710.png)
+
+打开系统设置-隐私与安全性：
+
+选择仍然允许即可：
+
+![image-20230516104408637](img/image-20230516104408637.png)
+
 ## 查看帮助
 
 ```
@@ -87,18 +99,30 @@ Cost: 6.500702247s
 
 ```sh
 $ gscan icmp -h 192.168.1.1/24 
-IP			        Status
-192.168.1.1     Alive
+IP			          Status
+192.168.1.1       Alive
 Cost: 4.009240208s
+
+$ gscan icmp -h www.baidu.com
+IP                Status
+14.119.104.254		Alive
+14.119.104.189		Alive
+Cost: 6.521059042s
+
+$ gscan icmp -h 192.168.1.1-20/24
+IP			          Status
+192.168.1.1		    Alive
+Cost: 6.515521625s
+
 ```
 
 ### 多目标 存活探测
 
 ```sh
 $ gscan icmp -h 192.168.1.1 -h 192.168.2.2
-IP              Status
-192.168.1.1     Alive
-192.168.2.2     Alive
+IP                Status
+192.168.1.1       Alive
+192.168.2.2       Alive
 Cost: 4.002214791s
 
 ```

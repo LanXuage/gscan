@@ -131,3 +131,15 @@ func Exec(command string) []byte {
 	}
 	return out
 }
+
+func SetBPF(name string) {
+	for _, iface := range *getActiveIfaces() {
+		iface.Handle.SetBPFFilter(name)
+	}
+}
+
+func RemoveBPF() {
+	for _, iface := range *getActiveIfaces() {
+		iface.Handle.SetBPFFilter("")
+	}
+}

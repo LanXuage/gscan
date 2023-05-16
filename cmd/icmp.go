@@ -30,6 +30,12 @@ var (
 					cmd.Help()
 					return nil
 				}
+
+				if ttl, _ := cmd.Flags().GetUint8("ttl"); ttl != 0 {
+					fmt.Println("ttl")
+					return nil
+				}
+
 				fmt.Printf("IP\t\t\tStatus\n")
 				for _, host := range hosts {
 					if len(host) == 0 {
@@ -78,5 +84,5 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 func init() {
 	rootCmd.AddCommand(icmpCmd)
 	icmpCmd.Flags().StringArrayP("hosts", "h", []string{}, "host, domain or cidr to scan")
-	// icmpCmd.Flags().StringP("file", "f", "", "host, domain and cidr")
+	icmpCmd.Flags().Uint8P("ttl", "t", 0, "traceroute by ttl")
 }

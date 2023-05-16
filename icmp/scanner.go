@@ -21,12 +21,15 @@ var arpInstance = arp.GetARPScanner()
 var logger = common.GetLogger()
 
 type ICMPScanner struct {
-	Stop     chan struct{}        // 发包结束的信号
-	Results  ICMPResultMap        // 存放本次扫描结果
-	TargetCh chan *ICMPTarget     // 暂存单个所需扫描的IP
-	ResultCh chan *ICMPScanResult // 暂存单个IP扫描结果
-	IPList   []netip.Addr         // 存放本次所需扫描的IP
-	Timeout  time.Duration        // 默认超时时间
+	Stop      chan struct{}        // 发包结束的信号
+	TargetCh  chan *ICMPTarget     // 暂存单个所需扫描的IP
+	ResultCh  chan *ICMPScanResult // 暂存单个IP扫描结果
+	TResultCh chan *ICMPTTLResult  // TTL Channel
+	Results   ICMPResultMap        // 存放本次扫描结果
+	TResults  []ICMPTTLResult      // 存放TTL扫描结果
+	IPList    []netip.Addr         // 存放本次所需扫描的IP
+	Timeout   time.Duration        // 默认超时时间
+	TTL       uint8                // 默认Time To Live
 }
 
 type ICMPTarget struct {
@@ -44,6 +47,11 @@ type ICMPScanResult struct {
 
 type ICMPResultMap *cmap.ConcurrentMap[string, bool]
 
+type ICMPTTLResult struct {
+	IP        netip.Addr
+	ReplyTime [3]float32
+}
+
 func NewICMPScanner() *ICMPScanner {
 	_rMap := cmap.New[bool]()
 	rMap := ICMPResultMap(&_rMap)
@@ -55,8 +63,10 @@ func NewICMPScanner() *ICMPScanner {
 		Results:  rMap,
 		IPList:   []netip.Addr{},
 		Timeout:  time.Second * 3,
+		TTL:      64,
 	}
 
+	// go common.SetBPF("icmp")
 	go icmpScanner.Recv()
 	go icmpScanner.Scan()
 
@@ -65,9 +75,13 @@ func NewICMPScanner() *ICMPScanner {
 
 func (icmpScanner *ICMPScanner) Close() {
 	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
+	common.GetReceiver().Unregister("ttl")
+
 	close(icmpScanner.Stop)
 	close(icmpScanner.ResultCh)
 	close(icmpScanner.TargetCh)
+
+	// common.RemoveBPF()
 }
 
 // ICMP发包
@@ -90,7 +104,7 @@ func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
 			DstIP:    target.DstIP.AsSlice(),
 			Version:  4,
 			Flags:    layers.IPv4DontFragment,
-			TTL:      64,
+			TTL:      icmpScanner.TTL,
 		}
 
 		icmpLayer := &layers.ICMPv4{
@@ -153,7 +167,7 @@ func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) {
 }
 
 func (icmpScanner *ICMPScanner) goGenerateTargetByIPList(ipList []netip.Addr, timeoutCh chan struct{}) {
-	if arpInstance.Ifaces == nil {
+	if arpInstance.Ifas == nil {
 		logger.Fatal("Get Ifaces Failed")
 		return
 	}
@@ -218,6 +232,23 @@ func (icmpScanner *ICMPScanner) generateTargetByPrefix(prefix netip.Prefix, ifac
 	}
 }
 
+func (icmpScanner *ICMPScanner) GetTTL(ip netip.Addr) {
+
+}
+
+func (icmpScanner *ICMPScanner) SendTTL() {
+
+}
+
+// 接收TTL
+func (icmpScanner *ICMPScanner) RecvTTL() {
+	for r := range common.GetReceiver().Register("ttl", icmpScanner.RecvICMP) {
+		if result, ok := r.(ICMPTTLResult); ok {
+			icmpScanner.TResultCh <- &result
+		}
+	}
+}
+
 // 接收协程
 func (icmpScanner *ICMPScanner) Recv() {
 	for r := range common.GetReceiver().Register(constant.ICMPREGISTER_NAME, icmpScanner.RecvICMP) {
@@ -240,18 +271,34 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 
 	if icmp.Id == constant.ICMPId &&
 		icmp.Seq == constant.ICMPSeq {
+
+		// 正常ICMP响应包
 		if icmp.TypeCode.Type() == layers.ICMPv4TypeEchoReply &&
 			icmp.TypeCode.Code() == layers.ICMPv4CodeNet {
 			ip := common.PacketToIPv4(packet)
 			if ip != nil {
 				if _, ok := (*icmpScanner.Results).Get(ip.To4().String()); !ok {
-					(*icmpScanner.Results).Set(ip.To4().String(), true)
 
+					(*icmpScanner.Results).Set(ip.To4().String(), true)
 					_ip, _ := netip.AddrFromSlice(ip)
+
 					return ICMPScanResult{
 						IP:       _ip,
 						IsActive: true,
 					}
+				}
+			}
+		}
+
+		// TTL ICMP响应包
+		if icmp.TypeCode.Type() == layers.ICMPv4TypeTimeExceeded &&
+			icmp.TypeCode.Code() == layers.ICMPv4CodeTTLExceeded {
+			ip := common.PacketToIPv4(packet)
+			if ip != nil {
+				_ip, _ := netip.AddrFromSlice(ip)
+
+				return ICMPTTLResult{
+					IP: _ip,
 				}
 			}
 		}
