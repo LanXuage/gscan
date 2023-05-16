@@ -1,7 +1,19 @@
 DIRECTORY=bin
 LINUX_FLAGS='-linkmode external -extldflags "-static -s -w"'
 WIN_FLAGS='-extldflags "-s -w"'
-VERSION=0.2.2
+VERSION=`git describe --abbrev=0 --tags`
+
+.PHONY: all create-directory windows darwin linux clean wheel help
+
+ifeq ($(shell uname),Darwin)
+	PLATFORM="darwin"
+else
+	ifeq ($(OS),Windows_NT)
+		PLATFORM="windows"
+	else
+		PLATFORM="linux"
+	endif
+endif
 
 all: clean create-directory windows linux darwin
 
@@ -36,6 +48,11 @@ clean:
 wheel:
 	echo "Compiling wheel"
 	chmod +x bin/gscan-*
+	sed -i "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
+	sed -i "s/__version__\s*=\s*'[0-9\.]*'/__version__ = '${VERSION}'/g" gscan/__version__.py
 	pip install wheel setuptools build twine
 	python -m build
 	python -m twine upload -u ${PYPI_API_USERNAME} -p ${PYPI_API_TOKEN} --verbose --skip-existing dist/*
+
+help:
+	echo "help"

@@ -21,7 +21,7 @@ var (
 https://github.com/LanXuage/gscan
 
 A Scanner. `,
-		Version: "0.2.2",
+		Version: "0.1.0",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
