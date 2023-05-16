@@ -60,7 +60,7 @@ Flags:
 Use "gscan [command] --help" for more information about a command.
 ```
 
-详细命令作用参考[这里](doc/command.md)。
+详细命令作用参考[这里](docs/command.md)。
 
 ## 简单例子
 
@@ -192,7 +192,7 @@ make linux
 
 ## 开发规范
 
-参考[这里](doc/development.md)
+参考[这里](docs/development.md)
 
 # 感谢
 
