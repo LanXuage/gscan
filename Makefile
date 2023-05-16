@@ -8,15 +8,13 @@ PLATFORM=linux
 
 
 ifeq (${RELEASE_VERSION},)
-	VERSION=`git describe --abbrev=0 --tags`
+VERSION=`git describe --abbrev=0 --tags`
 endif
 
 ifeq ($(shell uname),Darwin)
-	PLATFORM="darwin"
-else
-	ifeq ($(OS),Windows_NT)
-		PLATFORM="windows"
-	endif
+PLATFORM=darwin
+else ifeq ($(OS),Windows_NT)
+PLATFORM=windows
 endif
 
 all: clean create-directory windows linux darwin
