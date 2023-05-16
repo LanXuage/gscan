@@ -2,6 +2,11 @@ DIRECTORY=bin
 LINUX_FLAGS=-linkmode external -extldflags \"-static -s -w\"
 WIN_FLAGS='-extldflags "-s -w"'
 PLATFORM=linux
+ifeq ($(shell uname),Darwin)
+PLATFORM=darwin
+else ifeq ($(OS),Windows_NT)
+PLATFORM=windows
+endif
 
 all: clean create-directory windows linux darwin
 
@@ -31,9 +36,9 @@ clean:
 
 test:
 	echo $(shell uname)
-ifeq ($(shell uname),Darwin)
-	export PLATFORM=darwin
-else ifeq ($(OS),Windows)
-	export PLATFORM=windows
-endif
 	echo ${PLATFORM}
+ifeq (${PLATFORM},Darwin)
+	echo "darwinA"
+else
+	echo "linuxA"
+endif
