@@ -5,9 +5,7 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "LanXuage-patch-2" ]
 
 jobs:
 
