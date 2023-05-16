@@ -6,7 +6,6 @@ PLATFORM=linux
 
 .PHONY: all create-directory init-version windows darwin linux clean wheel help
 
-
 ifeq (${RELEASE_VERSION},)
 VERSION=`git describe --abbrev=0 --tags`
 endif
@@ -23,7 +22,7 @@ create-directory:
 	mkdir ${DIRECTORY}
 
 init-version:
-ifeq (${PLATFORM},darwin) 
+ifeq (${PLATFORM},darwin)
 	sed -i "_bak" "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
 else 
 	sed -i "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
