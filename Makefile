@@ -1,6 +1,7 @@
 DIRECTORY=bin
 LINUX_FLAGS=-linkmode external -extldflags \"-static -s -w\"
 WIN_FLAGS='-extldflags "-s -w"'
+PLATFORM=linux
 
 all: clean create-directory windows linux darwin
 
@@ -29,8 +30,7 @@ clean:
 	rm -rf ${DIRECTORY}
 
 test:
-PLATFORM=linux
-echo $(shell uname)
+	echo $(shell uname)
 ifeq ($(shell uname),Darwin)
 	PLATFORM=darwin
 else
