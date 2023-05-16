@@ -25,7 +25,11 @@ create-directory:
 	mkdir ${DIRECTORY}
 
 init-version:
+ifeq (${PLATFORM},darwin) 
+	sed -i "_bak" "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
+else 
 	sed -i "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
+endif
 
 windows: init-version
 	echo "Compiling Windows binary"
