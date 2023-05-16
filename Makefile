@@ -3,7 +3,7 @@ LINUX_FLAGS='-linkmode external -extldflags "-static -s -w"'
 WIN_FLAGS='-extldflags "-s -w"'
 VERSION=`git describe --abbrev=0 --tags`
 
-.PHONY: all create-directory windows darwin linux clean wheel help
+.PHONY: all create-directory init-version windows darwin linux clean wheel help
 
 ifeq ($(shell uname),Darwin)
 	PLATFORM="darwin"
@@ -20,12 +20,15 @@ all: clean create-directory windows linux darwin
 create-directory:
 	mkdir ${DIRECTORY}
 
-windows:
+init-version:
+	sed -i "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
+
+windows: init-version
 	echo "Compiling Windows binary"
 	env GOOS=windows GOARCH=amd64 go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-amd64.exe cli/main.go
 	env GOOS=windows GOARCH=386 go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-windows-386.exe cli/main.go
 
-darwin:
+darwin: init-version
 	echo "Compiling Darwin binary"
 	brew install libpcap
 	env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_LDFLAGS="-L/usr/local/opt/libpcap/lib" CGO_CPPFLAGS="-I/usr/local/opt/libpcap/include" go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-amd64 cli/main.go
@@ -35,7 +38,7 @@ darwin:
 	cd /Users/runner/work/gscan/gscan
 	env CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_LDFLAGS="-L/usr/local/opt/libpcap-1.10.4/" CGO_CPPFLAGS="-I/usr/local/opt/libpcap-1.10.4/" go build -v -x --ldflags ${WIN_FLAGS} -o ${DIRECTORY}/gscan-darwin-arm64 cli/main.go
 
-linux:
+linux: init-version
 	echo "Compiling Linux binary"
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=amd64 -e LDFLAGS_A=${LINUX_FLAGS} -iv $(PWD):/mnt amd64/alpine:3.18 /mnt/build.sh
 	docker run --rm -e DIRECTORY=${DIRECTORY} -e GOOS=linux -e GOARCH=386 -e LDFLAGS_A=${LINUX_FLAGS} -iv $(PWD):/mnt i386/alpine:3.18 /mnt/build.sh
@@ -48,7 +51,6 @@ clean:
 wheel:
 	echo "Compiling wheel"
 	chmod +x bin/gscan-*
-	sed -i "s/Version\s*:\s*\"[0-9\.]*\"/Version: \"${VERSION}\"/g" cmd/root.go
 	sed -i "s/__version__\s*=\s*'[0-9\.]*'/__version__ = '${VERSION}'/g" gscan/__version__.py
 	pip install wheel setuptools build twine
 	python -m build
