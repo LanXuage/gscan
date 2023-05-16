@@ -37,7 +37,7 @@ clean:
 test:
 	echo $(shell uname)
 	echo ${PLATFORM}
-ifeq (${PLATFORM},Darwin)
+ifeq (${PLATFORM},darwin)
 	echo "darwinA"
 else
 	echo "linuxA"
