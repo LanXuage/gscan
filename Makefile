@@ -1,17 +1,21 @@
 DIRECTORY=bin
 LINUX_FLAGS='-linkmode external -extldflags "-static -s -w"'
 WIN_FLAGS='-extldflags "-s -w"'
-VERSION=`git describe --abbrev=0 --tags`
+VERSION=${RELEASE_VERSION}
+PLATFORM=linux
 
 .PHONY: all create-directory init-version windows darwin linux clean wheel help
+
+
+ifeq (${RELEASE_VERSION},)
+	VERSION=`git describe --abbrev=0 --tags`
+endif
 
 ifeq ($(shell uname),Darwin)
 	PLATFORM="darwin"
 else
 	ifeq ($(OS),Windows_NT)
 		PLATFORM="windows"
-	else
-		PLATFORM="linux"
 	endif
 endif
 
@@ -58,3 +62,5 @@ wheel:
 
 help:
 	echo "help"
+	echo ${VERSION}
+	echo ${PLATFORM}
