@@ -8,13 +8,12 @@ on:
     # branches: [ "main" ]
     tags:
       - "*"
-
+env:
+  RELEASE_VERSION: ${{ github.ref }}
 jobs:
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest
-    env:
-      RELEASE_VERSION: ${{ github.ref }}
     steps:
       -
         name: Checkout
