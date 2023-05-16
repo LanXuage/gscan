@@ -32,10 +32,8 @@ clean:
 test:
 	echo $(shell uname)
 ifeq ($(shell uname),Darwin)
-	PLATFORM=darwin
-else
-	ifeq ($(OS),Windows)
-		PLATFORM=windows
-	endif
+	export PLATFORM=darwin
+else ifeq ($(OS),Windows)
+	export PLATFORM=windows
 endif
 	echo ${PLATFORM}
