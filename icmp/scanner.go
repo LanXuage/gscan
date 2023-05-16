@@ -75,7 +75,7 @@ func NewICMPScanner() *ICMPScanner {
 
 func (icmpScanner *ICMPScanner) Close() {
 	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
-	common.GetReceiver().Unregister("ttl")
+	common.GetReceiver().Unregister(constant.TTLREGISTER_NAME)
 
 	close(icmpScanner.Stop)
 	close(icmpScanner.ResultCh)
@@ -242,7 +242,7 @@ func (icmpScanner *ICMPScanner) SendTTL() {
 
 // 接收TTL
 func (icmpScanner *ICMPScanner) RecvTTL() {
-	for r := range common.GetReceiver().Register("ttl", icmpScanner.RecvICMP) {
+	for r := range common.GetReceiver().Register(constant.TTLREGISTER_NAME, icmpScanner.RecvICMP) {
 		if result, ok := r.(ICMPTTLResult); ok {
 			icmpScanner.TResultCh <- &result
 		}

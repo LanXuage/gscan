@@ -9,6 +9,7 @@ const (
 // recevier register name
 const (
 	ICMPREGISTER_NAME string = "ICMP"
+	TTLREGISTER_NAME  string = "TTL"
 )
 
 const (
