@@ -66,6 +66,7 @@ func IsSameLAN(ip net.IP, otherIp net.IP, mask uint32) bool {
 	return IP2Uint32(ip)&mask == IP2Uint32(otherIp)&mask
 }
 
+// 获取源IP
 func PacketToIPv4(packet gopacket.Packet) net.IP {
 	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
@@ -76,21 +77,23 @@ func PacketToIPv4(packet gopacket.Packet) net.IP {
 	return net.IPv4zero
 }
 
+// 获取TTL
+func PacketToTTL(packet gopacket.Packet) uint8 {
+	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		if ip != nil {
+			return ip.TTL
+		}
+	}
+	return 0
+}
+
 func GetHandle(deviceName string) *pcap.Handle {
 	handle, err := pcap.OpenLive(deviceName, 65535, true, pcap.BlockForever)
 	if err != nil {
 		logger.Error("Get Handle failed", zap.String("deviceName", deviceName), zap.Error(err))
 	}
 	return handle
-}
-
-// Deprecated: use IPList2NetIPList instead
-func _IPList2NetIPList(ipList []string) []net.IP {
-	s := []net.IP{}
-	for _, ip := range ipList {
-		s = append(s, net.ParseIP(ip).To4())
-	}
-	return s
 }
 
 func IPList2NetIPList(ipList []string) []netip.Addr {

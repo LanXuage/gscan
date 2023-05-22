@@ -26,43 +26,58 @@ var (
 			icmpScanner.Timeout = time.Millisecond * time.Duration(timeout)
 
 			if hosts, err := cmd.Flags().GetStringArray("hosts"); err == nil {
-				if len(hosts) == 0 {
-					cmd.Help()
+				icmpScanner.Init()
+				if len(hosts) != 0 {
+					fmt.Printf("IP\t\t\tStatus\n")
+					for _, host := range hosts {
+						if len(host) == 0 {
+							return nil
+						}
+						logger.Debug("runE", zap.Any("host", host))
+						if ip, err := netip.ParseAddr(host); err == nil {
+							logger.Debug("icmp", zap.Any("ip", ip))
+							ipList := []netip.Addr{}
+							ipList = append(ipList, ip)
+							timeoutCh := icmpScanner.ScanList(ipList)
+							icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+						}
+						if prefix, err := netip.ParsePrefix(host); err == nil {
+							logger.Debug("runE", zap.Any("prefix", prefix))
+							timeoutCh := icmpScanner.ScanListByPrefix(prefix)
+							icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+						}
+						if ips, err := ParseAddr(host); err == nil {
+							logger.Debug("runE", zap.Any("ips", ips))
+							timeoutCh := icmpScanner.ScanList(ips)
+							icmpPrintf(timeoutCh, icmpScanner.ResultCh)
+						}
+					}
+					fmt.Printf("Cost: %v\n", time.Since(start))
 					return nil
 				}
-
-				if ttl, _ := cmd.Flags().GetUint8("ttl"); ttl != 0 {
-					fmt.Println("ttl")
-					return nil
-				}
-
-				fmt.Printf("IP\t\t\tStatus\n")
-				for _, host := range hosts {
-					if len(host) == 0 {
-						return nil
-					}
-					logger.Debug("runE", zap.Any("host", host))
-					if ip, err := netip.ParseAddr(host); err == nil {
-						logger.Debug("icmp", zap.Any("ip", ip))
-						ipList := []netip.Addr{}
-						ipList = append(ipList, ip)
-						timeoutCh := icmpScanner.ScanList(ipList)
-						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
-					}
-					if prefix, err := netip.ParsePrefix(host); err == nil {
-						logger.Debug("runE", zap.Any("prefix", prefix))
-						timeoutCh := icmpScanner.ScanListByPrefix(prefix)
-						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
-					}
-					if ips, err := ParseAddr(host); err == nil {
-						logger.Debug("runE", zap.Any("ips", ips))
-						timeoutCh := icmpScanner.ScanList(ips)
-						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
-					}
-				}
-				fmt.Printf("Cost: %v\n", time.Since(start))
 			}
 
+			if ttl, _ := cmd.Flags().GetString("ttl"); ttl != "" {
+				icmpScanner.Choice = 2
+				icmpScanner.Init()
+				logger.Debug("UDPTTL", zap.Any("ip", ttl))
+
+				ip, err := netip.ParseAddr(ttl)
+				if err == nil {
+					fmt.Printf("traceroute to %s, %d hops max, Timeout: %v\n", ip, icmpScanner.TTL, icmpScanner.Timeout)
+					timeoutCh := icmpScanner.ScanOne(ip)
+					select {
+					case result := <-icmpScanner.TResultCh:
+						fmt.Printf("IP: %s", result.IP.As4())
+					case <-timeoutCh:
+						fmt.Printf("Cost: %v\n", time.Since(start))
+						return nil
+					}
+				}
+				return nil
+			}
+
+			cmd.Help()
 			return nil
 		},
 	}
@@ -84,5 +99,5 @@ func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
 func init() {
 	rootCmd.AddCommand(icmpCmd)
 	icmpCmd.Flags().StringArrayP("hosts", "h", []string{}, "host, domain or cidr to scan")
-	icmpCmd.Flags().Uint8P("ttl", "t", 0, "traceroute by ttl")
+	icmpCmd.Flags().StringP("ttl", "t", "", "traceroute by udp")
 }

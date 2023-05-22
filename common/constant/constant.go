@@ -15,3 +15,7 @@ const (
 const (
 	CHANNEL_SIZE uint8 = 10
 )
+
+const (
+	TTL_TIMES int = 3
+)

@@ -1,7 +1,9 @@
 package icmp
 
 import (
+	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/netip"
 	"time"
@@ -30,6 +32,8 @@ type ICMPScanner struct {
 	IPList    []netip.Addr         // 存放本次所需扫描的IP
 	Timeout   time.Duration        // 默认超时时间
 	TTL       uint8                // 默认Time To Live
+	Choice    int                  // 选择常规Ping或TTL，默认为常规Ping，值为1，选择TTL则设置为2
+	TmpTime   time.Time            // TTL时需要用到的时间
 }
 
 type ICMPTarget struct {
@@ -48,9 +52,10 @@ type ICMPScanResult struct {
 type ICMPResultMap *cmap.ConcurrentMap[string, bool]
 
 type ICMPTTLResult struct {
-	IP        netip.Addr
-	ReplyTime [3]float32
+	IP netip.Addr
 }
+
+type ICMPTTLResultMap *cmap.ConcurrentMap[string, []time.Duration]
 
 func NewICMPScanner() *ICMPScanner {
 	_rMap := cmap.New[bool]()
@@ -64,18 +69,24 @@ func NewICMPScanner() *ICMPScanner {
 		IPList:   []netip.Addr{},
 		Timeout:  time.Second * 3,
 		TTL:      64,
+		Choice:   1,
 	}
-
-	// go common.SetBPF("icmp")
-	go icmpScanner.Recv()
-	go icmpScanner.Scan()
 
 	return icmpScanner
 }
 
+func (icmpScanner *ICMPScanner) Init() {
+	go icmpScanner.Recv()
+	go icmpScanner.Scan()
+}
+
 func (icmpScanner *ICMPScanner) Close() {
-	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
-	common.GetReceiver().Unregister(constant.TTLREGISTER_NAME)
+	switch icmpScanner.Choice {
+	case 1:
+		common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
+	case 2:
+		common.GetReceiver().Unregister(constant.TTLREGISTER_NAME)
+	}
 
 	close(icmpScanner.Stop)
 	close(icmpScanner.ResultCh)
@@ -86,7 +97,7 @@ func (icmpScanner *ICMPScanner) Close() {
 
 // ICMP发包
 func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
-	payload := []byte("1") // 特征
+	payload := []byte("") // 特征
 	buffer := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
 
@@ -140,9 +151,132 @@ func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
 
 }
 
+// Deprecated: use SendTTLbyUDP instead.
+func (icmpScanner *ICMPScanner) SendTTLbyICMP(target *ICMPTarget) {
+	payload := []byte("") // 特征
+	buffer := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
+
+	// 构建以太网层
+	ethLayer := &layers.Ethernet{
+		SrcMAC: target.SrcMac,
+		DstMAC: target.DstMac,
+	}
+
+	if target.SrcIP.Is4() {
+		ethLayer.EthernetType = layers.EthernetTypeIPv4
+		ipLayer := &layers.IPv4{
+			Protocol: layers.IPProtocolICMPv4,
+			SrcIP:    target.SrcIP.AsSlice(),
+			DstIP:    target.DstIP.AsSlice(),
+			Version:  4,
+			Flags:    layers.IPv4DontFragment,
+		}
+
+		icmpLayer := &layers.ICMPv4{
+			TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, layers.ICMPv4CodeNet),
+			Id:       constant.ICMPId,
+			Seq:      constant.ICMPSeq,
+		}
+
+		var ttl uint8 = 1
+		for ; ttl < icmpScanner.TTL; ttl++ {
+			ipLayer.TTL = ttl
+
+			// 合并数据包并进行序列化
+			err := gopacket.SerializeLayers(
+				buffer,
+				opts,
+				ethLayer,
+				ipLayer,
+				icmpLayer,
+				gopacket.Payload(payload),
+			)
+
+			if err != nil {
+				logger.Error("Combine Buffer Error", zap.Error(err))
+			}
+
+			err = target.Handle.WritePacketData(buffer.Bytes())
+			if err != nil {
+				log.Fatal(err)
+			}
+			time.Sleep(time.Second * 1)
+		}
+
+	} else {
+		ethLayer.EthernetType = layers.EthernetTypeIPv6
+	}
+}
+
+// TTL探测 UDP 发包
+func (icmpScanner *ICMPScanner) SendTTLbyUDP(target *ICMPTarget) {
+	udpBuffer := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
+
+	// 构建以太网层
+	ethLayer := &layers.Ethernet{
+		SrcMAC: target.SrcMac,
+		DstMAC: target.DstMac,
+	}
+
+	ipLayer := &layers.IPv4{
+		Version:  4,
+		SrcIP:    target.SrcIP.AsSlice(),
+		DstIP:    target.DstIP.AsSlice(),
+		Protocol: layers.IPProtocolUDP,
+	}
+
+	if target.SrcIP.Is4() {
+		ethLayer.EthernetType = layers.EthernetTypeIPv4
+		var ttl uint8 = 1
+		for ; ttl <= icmpScanner.TTL; ttl++ {
+			fmt.Printf("TTL: %d\n", ttl)
+			for i := 0; i < 3; i++ {
+				ipLayer.TTL = ttl
+
+				udpLayer := &layers.UDP{
+					SrcPort: layers.UDPPort(30768 + rand.Intn(34767)),
+					DstPort: layers.UDPPort(30768 + rand.Intn(34767)),
+				}
+
+				udpLayer.SetNetworkLayerForChecksum(ipLayer)
+
+				err := gopacket.SerializeLayers(
+					udpBuffer,
+					opts,
+					ethLayer,
+					ipLayer,
+					udpLayer,
+				)
+				if err != nil {
+					logger.Error("SerializeLayers Failed", zap.Error(err))
+				}
+
+				err = target.Handle.WritePacketData(udpBuffer.Bytes())
+				if err != nil {
+					logger.Error("WritePacketData Failed", zap.Error(err))
+				}
+
+			}
+			time.Sleep(time.Millisecond * 400)
+		}
+
+	} else {
+		ethLayer.EthernetType = layers.EthernetTypeIPv6
+	}
+}
+
 func (icmpScanner *ICMPScanner) Scan() {
-	for target := range icmpScanner.TargetCh {
-		icmpScanner.SendICMP(target)
+	switch icmpScanner.Choice {
+	case 1:
+		for target := range icmpScanner.TargetCh {
+			icmpScanner.SendICMP(target)
+		}
+	case 2:
+		for target := range icmpScanner.TargetCh {
+			icmpScanner.SendTTLbyUDP(target)
+		}
 	}
 }
 
@@ -152,7 +286,13 @@ func (icmpScanner *ICMPScanner) ScanList(ipList []netip.Addr) chan struct{} {
 	return timeoutCh
 }
 
-func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) {
+func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) chan struct{} {
+	timeoutCh := make(chan struct{})
+	go icmpScanner.goGenerateOne(ip, timeoutCh)
+	return timeoutCh
+}
+
+func (icmpScanner *ICMPScanner) goGenerateOne(ip netip.Addr, timeoutCh chan struct{}) {
 	for _, iface := range *arpInstance.Ifas {
 		if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
 			icmpScanner.TargetCh <- &ICMPTarget{
@@ -164,6 +304,9 @@ func (icmpScanner *ICMPScanner) ScanOne(ip netip.Addr) {
 			}
 		}
 	}
+
+	time.Sleep(icmpScanner.Timeout)
+	close(timeoutCh)
 }
 
 func (icmpScanner *ICMPScanner) goGenerateTargetByIPList(ipList []netip.Addr, timeoutCh chan struct{}) {
@@ -173,7 +316,7 @@ func (icmpScanner *ICMPScanner) goGenerateTargetByIPList(ipList []netip.Addr, ti
 	}
 
 	if len(ipList) == 0 {
-		logger.Fatal("IPList is NULL")
+		logger.Fatal("ipList is NULL")
 		return
 	}
 
@@ -232,28 +375,21 @@ func (icmpScanner *ICMPScanner) generateTargetByPrefix(prefix netip.Prefix, ifac
 	}
 }
 
-func (icmpScanner *ICMPScanner) GetTTL(ip netip.Addr) {
-
-}
-
-func (icmpScanner *ICMPScanner) SendTTL() {
-
-}
-
-// 接收TTL
-func (icmpScanner *ICMPScanner) RecvTTL() {
-	for r := range common.GetReceiver().Register(constant.TTLREGISTER_NAME, icmpScanner.RecvICMP) {
-		if result, ok := r.(ICMPTTLResult); ok {
-			icmpScanner.TResultCh <- &result
-		}
-	}
-}
-
 // 接收协程
 func (icmpScanner *ICMPScanner) Recv() {
-	for r := range common.GetReceiver().Register(constant.ICMPREGISTER_NAME, icmpScanner.RecvICMP) {
-		if result, ok := r.(ICMPScanResult); ok {
-			icmpScanner.ResultCh <- &result
+	switch icmpScanner.Choice {
+	case 1:
+		for r := range common.GetReceiver().Register(constant.ICMPREGISTER_NAME, icmpScanner.RecvICMP) {
+			if result, ok := r.(ICMPScanResult); ok {
+				icmpScanner.ResultCh <- &result
+			}
+		}
+	case 2:
+		for r := range common.GetReceiver().Register(constant.TTLREGISTER_NAME, icmpScanner.RecvICMP) {
+			if result, ok := r.(ICMPTTLResult); ok {
+				fmt.Println(result.IP)
+				icmpScanner.TResultCh <- &result
+			}
 		}
 	}
 }
@@ -269,16 +405,15 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 		return nil
 	}
 
+	// 常规PING响应包
 	if icmp.Id == constant.ICMPId &&
 		icmp.Seq == constant.ICMPSeq {
-
-		// 正常ICMP响应包
+		// 正常PING ICMP响应包
 		if icmp.TypeCode.Type() == layers.ICMPv4TypeEchoReply &&
 			icmp.TypeCode.Code() == layers.ICMPv4CodeNet {
 			ip := common.PacketToIPv4(packet)
 			if ip != nil {
 				if _, ok := (*icmpScanner.Results).Get(ip.To4().String()); !ok {
-
 					(*icmpScanner.Results).Set(ip.To4().String(), true)
 					_ip, _ := netip.AddrFromSlice(ip)
 
@@ -289,38 +424,31 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 				}
 			}
 		}
+	}
 
-		// TTL ICMP响应包
-		if icmp.TypeCode.Type() == layers.ICMPv4TypeTimeExceeded &&
-			icmp.TypeCode.Code() == layers.ICMPv4CodeTTLExceeded {
-			ip := common.PacketToIPv4(packet)
-			if ip != nil {
-				_ip, _ := netip.AddrFromSlice(ip)
-
-				return ICMPTTLResult{
-					IP: _ip,
-				}
+	// TTL 响应包
+	if icmp.TypeCode.Type() == layers.ICMPv4TypeTimeExceeded &&
+		icmp.TypeCode.Code() == layers.ICMPv4CodeTTLExceeded {
+		ip := common.PacketToIPv4(packet)
+		if ip != nil {
+			_ip, _ := netip.AddrFromSlice(ip)
+			tmp := ICMPTTLResult{
+				IP: _ip,
 			}
+			fmt.Println(tmp)
+			return tmp
+		}
+	}
+
+	if icmp.TypeCode.Type() == layers.ICMPv4TypeDestinationUnreachable &&
+		icmp.TypeCode.Code() == layers.ICMPv4CodePort {
+		ip := common.PacketToIPv4(packet)
+		if ip != nil {
+			fmt.Printf("Arrive The Destination: %s\n", ip)
+			return ICMPTTLResult{}
 		}
 	}
 	return nil
-}
-
-// 校验IPLIST
-func (icmpScanner *ICMPScanner) CheckIPList(timeoutCh chan struct{}) {
-
-	time.Sleep(icmpScanner.Timeout)
-	for _, ip := range icmpScanner.IPList {
-		if _, ok := (*icmpScanner.Results).Get(ip.String()); !ok {
-			// 该IP未进扫描结果，此时发包结束，并且经过一定时间的延时，未收到返回包，说明并未Ping通
-			icmpScanner.ResultCh <- &ICMPScanResult{
-				IP:       ip,
-				IsActive: false,
-			}
-			(*icmpScanner.Results).Set(ip.String(), false)
-		}
-	}
-	close(timeoutCh)
 }
 
 var icmpInstance = NewICMPScanner()

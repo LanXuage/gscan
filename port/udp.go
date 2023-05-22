@@ -15,11 +15,23 @@ import (
 )
 
 type UDPScanner struct {
-	Stop     chan struct{}
-	Results  []UDPResult
-	ResultCh chan *UDPResult
-	TargetCh chan *UDPTarget
-	Timeout  time.Duration
+	Stop      chan struct{}
+	Results   []UDPResult
+	ResultCh  chan *UDPResult
+	TargetCh  chan *UDPTarget
+	_TargetCh chan *UDPTTLTarget
+	Timeout   time.Duration
+	TTL       uint8
+}
+
+type UDPTTLTarget struct {
+	SrcIP   netip.Addr
+	DstIP   netip.Addr
+	SrcPort layers.UDPPort
+	DstPort layers.UDPPort
+	SrcMac  net.HardwareAddr
+	DstMac  net.HardwareAddr
+	Handle  *pcap.Handle
 }
 
 type UDPTarget struct {
@@ -43,24 +55,24 @@ func InitialUDPScanner() *UDPScanner {
 		Results:  []UDPResult{},
 		ResultCh: make(chan *UDPResult, 10),
 		TargetCh: make(chan *UDPTarget, 10),
-		Timeout:  time.Second * 5,
+		Timeout:  time.Second * 3,
+		TTL:      5,
 	}
 }
 
 func (u *UDPScanner) GenerateTarget(ipList []net.IP) {
 	defer close(u.TargetCh)
 
-	ifaces := common.GetActiveInterfaces()
+	ifaces := common.GetActiveIfaces()
 	if ifaces == nil || len(ipList) == 0 {
 		return
 	}
 
 	for _, iface := range *ifaces {
 		for _, ip := range ipList {
-			ig, _ := netip.AddrFromSlice(iface.Gateway)
-			igMac, _ := arpInstance.AHMap.Get(ig)
-			tmp := &UDPTarget{
-				SrcIP:    iface.IP,
+			igMac, _ := arpInstance.AHMap.Get(iface.Gateway)
+			u.TargetCh <- &UDPTarget{
+				SrcIP:    iface.IP.AsSlice(),
 				SrcPort:  layers.UDPPort(30768 + rand.Intn(34767)),
 				DstIP:    ip,
 				DstPorts: *common.GetDefaultPorts(),
@@ -68,16 +80,40 @@ func (u *UDPScanner) GenerateTarget(ipList []net.IP) {
 				DstMac:   igMac,
 				Handle:   iface.Handle,
 			}
-			u.TargetCh <- tmp
 		}
 	}
+}
 
+func (u *UDPScanner) GenerateTTLTarget(ip netip.Addr) {
+	ifaces := common.GetActiveIfaces()
+	if ifaces == nil {
+		return
+	}
+
+	for _, iface := range *ifaces {
+		igMac, _ := arpInstance.AHMap.Get(iface.Gateway)
+		u._TargetCh <- &UDPTTLTarget{
+			SrcIP:   iface.IP,
+			DstIP:   ip,
+			SrcPort: layers.UDPPort(30768 + rand.Intn(34767)),
+			DstPort: layers.UDPPort(30768 + rand.Intn(34767)),
+			SrcMac:  iface.HWAddr,
+			DstMac:  igMac,
+			Handle:  iface.Handle,
+		}
+	}
 }
 
 func (u *UDPScanner) Scan() {
 	defer close(u.Stop)
 	for target := range u.TargetCh {
 		u.SendUDP(target)
+	}
+}
+
+func (u *UDPScanner) ScanTTL() {
+	for target := range u._TargetCh {
+		u.SendTTL(target)
 	}
 }
 
@@ -127,10 +163,54 @@ func (u *UDPScanner) SendUDP(target *UDPTarget) {
 			logger.Error("WritePacketData Failed", zap.Error(err))
 		}
 
-		// fmt.Println(udpBuffer)
 		logger.Sugar().Infof("Send ip: %s, port: %d\n", target.DstIP, port)
 	}
+}
 
+func (u *UDPScanner) SendTTL(target *UDPTTLTarget) {
+	udpBuffer := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}
+
+	// 以太层
+	ethLayer := &layers.Ethernet{
+		SrcMAC:       target.SrcMac,
+		DstMAC:       target.DstMac,
+		EthernetType: layers.EthernetTypeIPv4,
+	}
+
+	// IP层
+	ipLayer := &layers.IPv4{
+		Version:  4,
+		SrcIP:    target.SrcIP.AsSlice(),
+		DstIP:    target.DstIP.AsSlice(),
+		Protocol: layers.IPProtocolUDP,
+	}
+
+	udpLayer := &layers.UDP{
+		SrcPort: target.SrcPort,
+		DstPort: target.DstPort,
+	}
+
+	var ttl uint8 = 1
+	for ; ttl < u.TTL; ttl++ {
+		for i := 0; i < 3; i++ {
+			ipLayer.TTL = ttl
+
+			udpLayer.SetNetworkLayerForChecksum(ipLayer)
+
+			err := gopacket.SerializeLayers(
+				udpBuffer,
+				opts,
+				ethLayer,
+				ipLayer,
+				udpLayer,
+			)
+
+			if err != nil {
+				logger.Error("SerializeLayers Failed", zap.Error(err))
+			}
+		}
+	}
 }
 
 func (u *UDPScanner) Recv() {
@@ -159,4 +239,10 @@ func (u *UDPScanner) RecvUDP(packet gopacket.Packet) interface{} {
 
 func (u *UDPScanner) Close() {
 	common.GetReceiver().Unregister(UDPREGISTER_NAME)
+}
+
+var udpScanner = InitialUDPScanner()
+
+func GetUDPScanner() *UDPScanner {
+	return udpScanner
 }

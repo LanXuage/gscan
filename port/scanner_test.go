@@ -111,6 +111,12 @@ func TestUDP(t *testing.T) {
 
 }
 
+func TestUDPTTL(t *testing.T) {
+	u := port.GetUDPScanner()
+	defer u.Close()
+
+}
+
 func TestNetip(t *testing.T) {
 	ip, _ := netip.ParseAddr("172.25.17.0")
 	t.Log(ip.IsValid())
