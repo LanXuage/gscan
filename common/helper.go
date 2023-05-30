@@ -130,3 +130,19 @@ func Exec(command string) []byte {
 	}
 	return out
 }
+
+func Bytes2Runes(b []byte) []rune {
+	r := []rune{}
+	for _, i := range b {
+		r = append(r, rune(i))
+	}
+	return r
+}
+
+func Runes2Bytes(r []rune) []byte {
+	b := []byte{}
+	for _, i := range r {
+		b = append(b, byte(i))
+	}
+	return b
+}

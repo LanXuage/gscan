@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/LanXuage/gscan/common"
 	"github.com/google/gopacket/layers"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/panjf2000/ants/v2"
@@ -97,7 +98,7 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 	for _, ruleItem := range (*target).Rule.Items {
 		switch ruleItem.DataType {
 		case GSRULE_DATA_TYPE_MATCH:
-			reStr := string(ruleItem.Data)
+			reStr := string(common.Bytes2Runes(ruleItem.Data))
 			r, ok := s.reCache.Get(reStr)
 			if !ok {
 				rTmp, err := regexp.Compile(reStr)
@@ -107,11 +108,12 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 				r = *rTmp
 				s.reCache.SetIfAbsent(reStr, r)
 			}
-			res := r.FindAllStringSubmatch(string(env.LastResp), -1)
-			for i, sname := range r.SubexpNames() {
-				if i != 0 && sname != "" {
-					_ = res[i]
-					// env.Vals[sname] = res[i]
+			results := r.FindAllStringSubmatch(string(common.Bytes2Runes(env.LastResp)), -1)
+			for _, result := range results {
+				for i, sname := range r.SubexpNames() {
+					if i != 0 && sname != "" {
+						env.Vals[sname] = common.Runes2Bytes([]rune(result[i]))
+					}
 				}
 			}
 		}
