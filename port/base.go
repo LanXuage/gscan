@@ -2,10 +2,10 @@ package port
 
 import (
 	"net"
-	"net/netip"
 
 	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/icmp"
 
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -23,7 +23,7 @@ const (
 )
 
 type TCPResult struct {
-	IP   netip.Addr
+	icmp.ICMPScanResult
 	Port layers.TCPPort
 }
 

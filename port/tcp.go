@@ -5,7 +5,9 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/icmp"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -83,7 +85,12 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 		}
 	}
 	return &TCPResult{
-		IP:   srcIP,
+		ICMPScanResult: icmp.ICMPScanResult{
+			ARPScanResult: arp.ARPScanResult{
+				IP: srcIP,
+			},
+			IsActive: true,
+		},
 		Port: tcp.SrcPort,
 	}
 }

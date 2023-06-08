@@ -1,13 +1,18 @@
 package service
 
 import (
+	"bytes"
 	"math/rand"
 	"net"
 	"net/netip"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/icmp"
+	"github.com/LanXuage/gscan/port"
 	"github.com/google/gopacket/layers"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/panjf2000/ants/v2"
@@ -15,6 +20,8 @@ import (
 )
 
 type ServiceResult struct {
+	port.TCPResult
+	CPE string
 }
 
 type ServiceInfo struct {
@@ -95,6 +102,17 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 		LastResp: serviceInfo.Banner,
 		Vals:     make(map[string][]byte),
 	}
+	serviceResult := &ServiceResult{
+		TCPResult: port.TCPResult{
+			ICMPScanResult: icmp.ICMPScanResult{
+				ARPScanResult: arp.ARPScanResult{
+					IP: target.IP,
+				},
+				IsActive: true,
+			},
+			Port: target.Port,
+		},
+	}
 	for _, ruleItem := range (*target).Rule.Items {
 		switch ruleItem.DataType {
 		case GSRULE_DATA_TYPE_MATCH:
@@ -116,6 +134,27 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 					}
 				}
 			}
+		// https://csrc.nist.gov/projects/security-content-automation-protocol/specifications/cpe
+		// cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
+		case GSRULE_DATA_TYPE_CPE23:
+			fmtStr := string(common.Bytes2Runes(ruleItem.Data))
+			wfnValsTmp := strings.Split(fmtStr, ":")
+			cpe := bytes.Buffer{}
+			cpe.WriteString("cpe:2.3")
+			i := 0
+			for _, wfnVal := range wfnValsTmp {
+				cpe.WriteString(":")
+				if wfnVal[0] == 60 && wfnVal[len(wfnVal)-1] == 62 {
+					cpe.WriteString(string(env.Vals[wfnVal[0:len(wfnVal)-2]]))
+				} else {
+					cpe.WriteString(wfnVal)
+				}
+				i += 1
+			}
+			for j := 0; j < 10-i; j++ {
+				cpe.WriteString(":")
+			}
+			serviceResult.CPE = cpe.String()
 		}
 	}
 }

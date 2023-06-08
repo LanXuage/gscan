@@ -38,7 +38,7 @@ type ICMPTarget struct {
 }
 
 type ICMPScanResult struct {
-	IP       netip.Addr
+	arp.ARPScanResult
 	IsActive bool // 是否存活
 }
 
@@ -249,7 +249,9 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 
 					_ip, _ := netip.AddrFromSlice(ip)
 					return ICMPScanResult{
-						IP:       _ip,
+						ARPScanResult: arp.ARPScanResult{
+							IP: _ip,
+						},
 						IsActive: true,
 					}
 				}
@@ -267,7 +269,9 @@ func (icmpScanner *ICMPScanner) CheckIPList(timeoutCh chan struct{}) {
 		if _, ok := (*icmpScanner.Results).Get(ip.String()); !ok {
 			// 该IP未进扫描结果，此时发包结束，并且经过一定时间的延时，未收到返回包，说明并未Ping通
 			icmpScanner.ResultCh <- &ICMPScanResult{
-				IP:       ip,
+				ARPScanResult: arp.ARPScanResult{
+					IP: ip,
+				},
 				IsActive: false,
 			}
 			(*icmpScanner.Results).Set(ip.String(), false)
