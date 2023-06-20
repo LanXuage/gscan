@@ -15,11 +15,11 @@ var arpInstance = arp.GetARPScanner()
 var receiver = common.GetReceiver()
 
 const (
-	TCP_REGISTER_NAME = "TCP"
-	UDPREGISTER_NAME  = "UDP"
-	DEFAULT_PORTS     = 0
-	ALL_PORTS         = 1
-	CUSTOM_PORTS      = 2
+	TCP_REGISTER_NAME       = "TCP"
+	UDPREGISTER_NAME        = "UDP"
+	DEFAULT_PORTS     uint8 = 0
+	ALL_PORTS         uint8 = 1
+	CUSTOM_PORTS      uint8 = 2
 )
 
 type TCPResult struct {

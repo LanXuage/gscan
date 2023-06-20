@@ -23,7 +23,7 @@ type TCPScanner struct {
 	OpenPorts    cmap.ConcurrentMap[netip.Addr, cmap.ConcurrentMap[layers.TCPPort, bool]]
 	Opts         gopacket.SerializeOptions
 	UseFullTCP   bool
-	PortScanType int8
+	PortScanType uint8
 	Ports        []layers.TCPPort
 	gCount       int64
 	sCount       int64

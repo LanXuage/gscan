@@ -23,7 +23,7 @@ type ARPScanner struct {
 	Ifaces   *[]common.GSInterface                            // 可用接口列表
 	Ifas     *[]common.GSIface                                // 可用接口列表
 	AHMap    cmap.ConcurrentMap[netip.Addr, net.HardwareAddr] // 获取到的IP <-> Mac 映射表
-	OMap     sync.Map                                         // Mac前缀 <-> 厂商 映射表
+	OMap     *sync.Map                                        // Mac前缀 <-> 厂商 映射表
 	Lock     sync.Mutex
 	TargetCh chan *Target
 	ResultCh chan *ARPScanResult

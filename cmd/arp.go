@@ -19,7 +19,7 @@ var (
 		Short: "ARP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arpScanner := arp.GetARPScanner()
-			defer arpScanner.Close()
+			// defer arpScanner.Close()
 			start := time.Now()
 			fmt.Printf("%-39s %-17s %-73s\n", "IP", "MAC", "VENDOR")
 			logger := common.GetLogger()

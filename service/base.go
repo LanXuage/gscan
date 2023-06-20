@@ -1,6 +1,9 @@
 package service
 
-import "github.com/LanXuage/gscan/common"
+import (
+	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/common"
+)
 
 var logger = common.GetLogger()
 
@@ -21,6 +24,8 @@ const (
 	GSRULE_DATA_TYPE_SH    uint8 = 8
 	GSRULE_DATA_TYPE_OTHER uint8 = 9
 )
+
+var arpInstance = arp.GetARPScanner()
 
 type GScanRuleItem struct {
 	DataType uint8
