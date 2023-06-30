@@ -27,7 +27,7 @@ var (
 			if withARP {
 				fmt.Printf("%-17s %-73s ", "MAC", "VENDOR")
 			}
-			fmt.Printf("%-24s %-5s\n", "PORT", "SERVICE")
+			fmt.Printf("%-24s %-5s\n", "PORT", "PROTOCOL")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
@@ -116,7 +116,7 @@ func normalPrintfService(timeoutCh chan struct{}, resultCh chan *service.Service
 				}
 				fmt.Printf("%-17v %-73s ", h, vendor)
 			}
-			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, result.CPE)
+			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, result.Protocol)
 		case <-timeoutCh:
 			return
 		}

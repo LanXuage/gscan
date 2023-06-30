@@ -23,17 +23,19 @@ import (
 type ServiceResult struct {
 	port.TCPResult
 	CPE string
+	Protocol string
 }
 
 type ServiceInfo struct {
 	Conn   net.Conn
 	Banner []byte
+	HasMatched bool
 }
 
 type ServiceTarget struct {
 	IP   netip.Addr
 	Port layers.TCPPort
-	Rule *GScanRule
+	Rule GScanRule
 }
 
 type ServiceScanner struct {
@@ -64,6 +66,12 @@ func (s *ServiceScanner) sendAndMatch(data interface{}) {
 		logger.Debug("sendAndMatch1", zap.Any("isNotScaned", isNotScaned))
 		isNotScaned = ipInfo.SetIfAbsent(target.Port, ServiceInfo{})
 		logger.Debug("sendAndMatch1", zap.Any("isNotScaned", isNotScaned))
+		if !isNotScaned {
+			serviceInfo, _ := ipInfo.Get(target.Port)
+			if serviceInfo.HasMatched {
+				return
+			}
+		}
 	} else {
 		serviceInfo := cmap.NewWithCustomShardingFunction[layers.TCPPort, ServiceInfo](func(key layers.TCPPort) uint32 { return uint32(key) })
 		serviceInfo.Set(target.Port, ServiceInfo{})
@@ -89,7 +97,7 @@ func (s *ServiceScanner) _sendAndMatch(network string, target *ServiceTarget, is
 }
 
 func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget, isNotScaned bool) {
-	logger.Debug("_sendAndMatchMux", zap.Any("target", target))
+	logger.Debug("_sendAndMatchMux", zap.Any("target", target), zap.Any("isNotScaned", isNotScaned))
 	ipInfo, _ := s.Services.Get(target.IP)
 	serviceInfo, _ := ipInfo.Get(target.Port)
 	if isNotScaned {
@@ -110,7 +118,13 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 		serviceInfo.Conn = conn
 		if len(banner) != 0 {
 			serviceInfo.Banner = banner
+		} else {
+			serviceInfo.Banner = []byte{}
 		}
+		ipInfo.Set(target.Port, serviceInfo)
+	}
+	for serviceInfo.Banner == nil {
+		serviceInfo, _ = ipInfo.Get(target.Port)
 	}
 	env := ScanEnv{
 		LastResp: serviceInfo.Banner,
@@ -144,6 +158,9 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 			logger.Debug("match", zap.Any("data", env.LastResp))
 			results := r.FindAllStringSubmatch(string(common.Bytes2Runes(env.LastResp)), -1)
 			logger.Debug("match", zap.Any("results", results))
+			if results == nil {
+				return
+			}
 			for _, result := range results {
 				for i, sname := range r.SubexpNames() {
 					if i != 0 && sname != "" {
@@ -151,15 +168,20 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 					}
 				}
 			}
-		// https://csrc.nist.gov/projects/security-content-automation-protocol/specifications/cpe
-		// cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
+		case GSRULE_DATA_TYPE_PROTOCOL:
+			serviceResult.Protocol = string(ruleItem.Data)
 		case GSRULE_DATA_TYPE_CPE23:
+			// https://csrc.nist.gov/projects/security-content-automation-protocol/specifications/cpe
+			// cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
 			fmtStr := string(common.Bytes2Runes(ruleItem.Data))
 			wfnValsTmp := strings.Split(fmtStr, ":")
 			cpe := bytes.Buffer{}
 			cpe.WriteString("cpe:2.3")
 			i := 0
 			for _, wfnVal := range wfnValsTmp {
+				if len(wfnVal) == 0 {
+					continue
+				}
 				cpe.WriteString(":")
 				logger.Debug("cpe23", zap.Any("key", wfnVal), zap.Any("Vals", env.Vals))
 				if wfnVal[0] == 60 && wfnVal[len(wfnVal)-1] == 62 {
@@ -171,12 +193,13 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 				i += 1
 			}
 			for j := 0; j < 10-i; j++ {
-				cpe.WriteString(":")
+				cpe.WriteString(":*")
 			}
 			logger.Debug(cpe.String())
 			serviceResult.CPE = cpe.String()
 		}
 	}
+	logger.Debug("s", zap.Any("s", serviceResult))
 	s.ResultCh <- serviceResult
 }
 
@@ -264,7 +287,7 @@ func (s *ServiceScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 			s.TargetCh <- &ServiceTarget{
 				IP:   ip,
 				Port: port,
-				Rule: &rule,
+				Rule: rule,
 			}
 			s.gCount += 1
 		}
