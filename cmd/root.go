@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/google/gopacket/pcap"
 )
 
 var (
@@ -21,7 +22,7 @@ var (
 https://github.com/LanXuage/gscan
 
 A Scanner. `,
-		Version: "0.3.2",
+		Version: "0.3.2 \n" + pcap.Version(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
