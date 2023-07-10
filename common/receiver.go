@@ -2,11 +2,18 @@ package common
 
 import (
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/panjf2000/ants/v2"
 	"go.uber.org/zap"
+)
+
+const (
+	MAX_RESULT_CHANNEL_SIZE = 256
+	MAX_HOOK_FUNC_POOL_SIZE = 512
+	WORKERS                 = 2
 )
 
 type Receiver struct {
@@ -43,10 +50,10 @@ func (r *Receiver) init() {
 		}
 		r.RecvWorkers = p
 		packets := src.Packets()
-		for i := 0; i < 10; i++ {
+		for i := 0; i < WORKERS; i++ {
 			r.RecvWorkers.Invoke(packets)
 		}
-		p, err = ants.NewPoolWithFunc(512, r.startHookFun)
+		p, err = ants.NewPoolWithFunc(MAX_HOOK_FUNC_POOL_SIZE, r.startHookFun)
 		if err != nil {
 			logger.Error("Create hookFunc pool failed", zap.Error(err))
 		}
@@ -58,7 +65,13 @@ func (r *Receiver) startHookFun(hookFunAndArgsI interface{}) {
 	hookFunAndArgs := hookFunAndArgsI.(HookFunResultChAndArgs)
 	result := hookFunAndArgs.HookFun(hookFunAndArgs.Packet)
 	if result != nil {
-		hookFunAndArgs.ResultCh <- result
+		if ret, ok := r.ResultChs.Load(hookFunAndArgs.Name); ok {
+			resultCh := ret.(chan interface{})
+			for len(resultCh) == MAX_RESULT_CHANNEL_SIZE {
+				time.Sleep(3 * time.Second)
+			}
+			resultCh <- result
+		}
 	}
 }
 
@@ -75,11 +88,15 @@ func (r *Receiver) recv(packets interface{}) {
 }
 
 func (r *Receiver) Register(name string, hookFun func(gopacket.Packet) interface{}) chan interface{} {
-	ret, _ := r.HookFunAndResultChs.LoadOrStore(name, HookFunAndResultCh{
-		HookFun:  hookFun,
-		ResultCh: make(chan interface{}, 10),
-	})
-	return ret.(HookFunAndResultCh).ResultCh
+	r.ResultChs.Load(name)
+	if _, ok := r.ResultChs.Load(name); !ok {
+		r.Lock.Lock()
+		defer r.Lock.Unlock()
+		r.ResultChs.Store(name, make(chan interface{}, MAX_RESULT_CHANNEL_SIZE))
+		r.HookFuns.Store(name, hookFun)
+	}
+	ret, _ := r.ResultChs.Load(name)
+	return ret.(chan interface{})
 }
 
 func (r *Receiver) Unregister(name string) {

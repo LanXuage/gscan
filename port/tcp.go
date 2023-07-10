@@ -60,10 +60,10 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 		return nil
 	}
 	if tcp.SYN && tcp.ACK && t.UseFullTCP {
-		iface := common.GetInterfaceBySrcMac(eth.DstMAC)
+		iface := common.GetIfaceBySrcMac(eth.DstMAC)
 		if iface != nil {
-			iface := common.GetInterfaceBySrcMac(eth.DstMAC)
-			t.TargetCh <- &TCPTarget{
+			iface := common.GetIfaceBySrcMac(eth.DstMAC)
+			t.addTarget(&TCPTarget{
 				SrcIP:    ip.DstIP,
 				DstIP:    ip.SrcIP,
 				DstPorts: &[]layers.TCPPort{tcp.SrcPort},
@@ -71,8 +71,7 @@ func (t *TCPScanner) RecvTCP(packet gopacket.Packet) interface{} {
 				DstMac:   eth.SrcMAC,
 				Ack:      tcp.Seq + 1,
 				Handle:   iface.Handle,
-			}
-			t.gCount += 1
+			}, true)
 			return nil
 		}
 	}
@@ -124,7 +123,7 @@ func (t *TCPScanner) SendSYNACK(target *TCPTarget) {
 			randIndex := randArea[0] + rand.Intn(randArea[1]-randArea[0])
 			t.generateTCPLayerAndSend(target, (*target.DstPorts)[randIndex], ethLayer, ipLayer)
 			dstPortsCount -= 1
-			logger.Debug("sendSynAck", zap.Any("dstPortCount", dstPortsCount))
+			logger.Debug("sendSynAck", zap.Any("dstPortCount", dstPortsCount), zap.Any("targetChSize", len(t.TargetCh)), zap.Any("resultChSize", len(t.ResultCh)))
 			if dstPortsCount == 0 {
 				close(randAreaCh)
 			}
@@ -213,10 +212,11 @@ func (t *TCPScanner) generateTCPLayerAndSend(target *TCPTarget, dstPort layers.T
 
 func (t *TCPScanner) Scan() {
 	for target := range t.TargetCh {
-		if t.UseRandom && rand.Intn(2) == 0 {
-			t.TargetCh <- target
+		if t.UseRandom && rand.Intn(3) == 0 {
+			t.addTarget(target, false)
 			continue
 		}
+		logger.Debug("Scan", zap.Any("targetChSize", len(t.TargetCh)), zap.Any("sCount", t.sCount))
 		t.SendSYNACK(target)
 		t.sCount += 1
 	}
@@ -244,7 +244,8 @@ func (t *TCPScanner) generateLocalNetTarget(timeoutCh chan struct{}) {
 func (t *TCPScanner) waitTimeout(timeoutCh chan struct{}) {
 	defer close(timeoutCh)
 	for {
-		time.Sleep(time.Microsecond * 100)
+		time.Sleep(time.Millisecond * 1)
+		logger.Debug("waitTimeout", zap.Any("gCount", t.gCount), zap.Any("sCount", t.sCount), zap.Any("targetChSize", len(t.TargetCh)))
 		if t.gCount == t.sCount && len(t.TargetCh) == 0 {
 			break
 		}
@@ -269,7 +270,8 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 	} else if t.PortScanType == CUSTOM_PORTS {
 		dstPorts = &t.Ports
 	}
-	t.TargetCh <- &TCPTarget{
+
+	t.addTarget(&TCPTarget{
 		SrcMac:   iface.HWAddr,
 		DstMac:   dstMac,
 		SrcIP:    iface.IP.AsSlice(),
@@ -277,16 +279,27 @@ func (t *TCPScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 		Ack:      0,
 		DstPorts: dstPorts,
 		Handle:   iface.Handle,
+	}, true)
+}
+
+func (t *TCPScanner) addTarget(target *TCPTarget, addGCount bool) {
+	for len(t.TargetCh) == MAX_CHANNEL_SIZE {
+		logger.Debug("sleep", zap.Any("targetChSize", len(t.TargetCh)))
+		time.Sleep(t.Timeout)
 	}
-	t.gCount += 1
+	t.TargetCh <- target
+	if addGCount {
+		t.gCount += 1
+	}
 }
 
 func (t *TCPScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {
 	for i := 0; i < 2; i++ {
 		nIp := prefix.Addr()
 		for {
+			logger.Debug("generateTargetByPrefix", zap.Any("nIP", nIp))
 			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
-				if !nIp.IsValid() || !prefix.Contains(nIp) || !iface.Mask.Contains(nIp) {
+				if !nIp.IsValid() || !prefix.Contains(nIp) {
 					break
 				} else {
 					t.generateTarget(nIp, iface)
@@ -318,10 +331,8 @@ func (t *TCPScanner) ScanMany(targetIPs []netip.Addr) chan struct{} {
 
 func (t *TCPScanner) goScanPrefix(prefix netip.Prefix, timeoutCh chan struct{}) {
 	defer t.waitTimeout(timeoutCh)
-	for _, iface := range *arpInstance.Ifas {
-		if iface.Mask.Contains(prefix.Addr()) {
-			t.generateTargetByPrefix(prefix, iface)
-		}
+	for _, iface := range *common.GetActiveIfaces() {
+		t.generateTargetByPrefix(prefix, iface)
 	}
 }
 
@@ -334,8 +345,8 @@ func (t *TCPScanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
 func newTCPScanner() *TCPScanner {
 	rand.Seed(time.Now().Unix())
 	t := &TCPScanner{
-		TargetCh:     make(chan *TCPTarget, 10),
-		ResultCh:     make(chan *TCPResult, 10),
+		TargetCh:     make(chan *TCPTarget, MAX_CHANNEL_SIZE),
+		ResultCh:     make(chan *TCPResult, MAX_CHANNEL_SIZE),
 		Timeout:      3 * time.Second,
 		SrcPort:      layers.TCPPort(30768 + rand.Intn(34767)),
 		OpenPorts:    cmap.NewWithCustomShardingFunction[netip.Addr, cmap.ConcurrentMap[layers.TCPPort, bool]](common.Fnv32),

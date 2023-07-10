@@ -20,6 +20,7 @@ const (
 	DEFAULT_PORTS     = 0
 	ALL_PORTS         = 1
 	CUSTOM_PORTS      = 2
+	MAX_CHANNEL_SIZE  = 256
 )
 
 type TCPResult struct {

@@ -87,8 +87,7 @@ var (
 						normalPrintfTCP(timeoutCh, tcpScanner.ResultCh)
 					}
 				} else {
-					timeoutCh := tcpScanner.ScanMany([]netip.Addr{ip})
-					normalPrintfTCP(timeoutCh, tcpScanner.ResultCh)
+					ips = append(ips, ip)
 				}
 			}
 			timeoutCh := tcpScanner.ScanMany(ips)
