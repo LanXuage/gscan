@@ -134,7 +134,6 @@ func getActiveIfaces() *[]GSIface {
 								HWAddr:  i.HardwareAddr,
 								IP:      ip,
 							}
-							logger.Debug("Get gs iface", zap.Any("gsIface", gsInterface))
 							gsInterfaces = append(gsInterfaces, gsInterface)
 							break
 						}

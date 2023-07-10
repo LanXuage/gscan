@@ -2,6 +2,7 @@ package common
 
 import (
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -9,26 +10,31 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	MAX_RESULT_CHANNEL_SIZE = 256
+	MAX_HOOK_FUNC_POOL_SIZE = 512
+	WORKERS                 = 2
+)
+
 type Receiver struct {
-	State          uint8
-	Lock           sync.Mutex
-	HookFuns       sync.Map
-	ResultChs      sync.Map
-	RecvWorkers    *ants.PoolWithFunc
-	HookFunWorkers *ants.PoolWithFunc
+	HookFunAndResultChs sync.Map
+	RecvWorkers         *ants.PoolWithFunc
+	HookFunWorkers      *ants.PoolWithFunc
 }
 
-type HookFunAndArgs struct {
-	Packet  gopacket.Packet
-	Name    string
-	HookFun func(packet gopacket.Packet) interface{}
+type HookFunAndResultCh struct {
+	HookFun  func(packet gopacket.Packet) interface{}
+	ResultCh chan interface{}
+}
+
+type HookFunResultChAndArgs struct {
+	HookFunAndResultCh
+	Packet gopacket.Packet
 }
 
 func newReceiver() *Receiver {
 	r := &Receiver{
-		State:     0,
-		HookFuns:  sync.Map{},
-		ResultChs: sync.Map{},
+		HookFunAndResultChs: sync.Map{},
 	}
 	r.init()
 	return r
@@ -44,10 +50,10 @@ func (r *Receiver) init() {
 		}
 		r.RecvWorkers = p
 		packets := src.Packets()
-		for i := 0; i < 10; i++ {
+		for i := 0; i < WORKERS; i++ {
 			r.RecvWorkers.Invoke(packets)
 		}
-		p, err = ants.NewPoolWithFunc(512, r.startHookFun)
+		p, err = ants.NewPoolWithFunc(MAX_HOOK_FUNC_POOL_SIZE, r.startHookFun)
 		if err != nil {
 			logger.Error("Create hookFunc pool failed", zap.Error(err))
 		}
@@ -56,22 +62,25 @@ func (r *Receiver) init() {
 }
 
 func (r *Receiver) startHookFun(hookFunAndArgsI interface{}) {
-	hookFunAndArgs := hookFunAndArgsI.(HookFunAndArgs)
+	hookFunAndArgs := hookFunAndArgsI.(HookFunResultChAndArgs)
 	result := hookFunAndArgs.HookFun(hookFunAndArgs.Packet)
 	if result != nil {
 		if ret, ok := r.ResultChs.Load(hookFunAndArgs.Name); ok {
-			ret.(chan interface{}) <- result
+			resultCh := ret.(chan interface{})
+			for len(resultCh) == MAX_RESULT_CHANNEL_SIZE {
+				time.Sleep(3 * time.Second)
+			}
+			resultCh <- result
 		}
 	}
 }
 
 func (r *Receiver) recv(packets interface{}) {
 	for packet := range packets.(chan gopacket.Packet) {
-		r.HookFuns.Range(func(key, value any) bool {
-			r.HookFunWorkers.Invoke(HookFunAndArgs{
-				Packet:  packet,
-				Name:    key.(string),
-				HookFun: value.(func(packet gopacket.Packet) interface{}),
+		r.HookFunAndResultChs.Range(func(key, value any) bool {
+			r.HookFunWorkers.Invoke(HookFunResultChAndArgs{
+				HookFunAndResultCh: value.(HookFunAndResultCh),
+				Packet:             packet,
 			})
 			return true
 		})
@@ -83,7 +92,7 @@ func (r *Receiver) Register(name string, hookFun func(gopacket.Packet) interface
 	if _, ok := r.ResultChs.Load(name); !ok {
 		r.Lock.Lock()
 		defer r.Lock.Unlock()
-		r.ResultChs.Store(name, make(chan interface{}, 10))
+		r.ResultChs.Store(name, make(chan interface{}, MAX_RESULT_CHANNEL_SIZE))
 		r.HookFuns.Store(name, hookFun)
 	}
 	ret, _ := r.ResultChs.Load(name)
@@ -91,12 +100,8 @@ func (r *Receiver) Register(name string, hookFun func(gopacket.Packet) interface
 }
 
 func (r *Receiver) Unregister(name string) {
-	if ret, ok := r.ResultChs.Load(name); ok {
-		r.Lock.Lock()
-		defer r.Lock.Unlock()
-		r.ResultChs.Delete(name)
-		r.HookFuns.Delete(name)
-		close(ret.(chan interface{}))
+	if ret, ok := r.HookFunAndResultChs.LoadAndDelete(name); ok {
+		close(ret.(HookFunAndResultCh).ResultCh)
 	}
 }
 
