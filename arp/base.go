@@ -48,7 +48,7 @@ func newARPScanner() *ARPScanner {
 			ComputeChecksums: true,
 		},
 		Timeout:  3 * time.Second,
-		OMap:     common.GetOui(),
+		OMap:     *common.GetOui(),
 		AHMap:    cmap.NewWithCustomShardingFunction[netip.Addr, net.HardwareAddr](common.Fnv32),
 		Ifaces:   common.GetActiveInterfaces(),
 		Ifas:     common.GetActiveIfaces(),

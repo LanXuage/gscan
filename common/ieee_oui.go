@@ -2,7 +2,7 @@ package common
 
 import "sync"
 
-func GetOui() sync.Map {
+func GetOui() *sync.Map {
 	var oui sync.Map
 	oui.Store("0050C27D5", "DEUTA-WERKE GmbH")
 	oui.Store("40D85511C", "DEUTA-WERKE GmbH")
@@ -47976,5 +47976,5 @@ func GetOui() sync.Map {
 	oui.Store("8C1F6452A", "Hiwin Mikrosystem Corp.")
 	oui.Store("8C1F64461", "Kara Partners LLC")
 	oui.Store("8C1F64AD4", "Flextronics International Kft")
-	return oui
+	return &oui
 }

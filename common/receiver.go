@@ -65,13 +65,10 @@ func (r *Receiver) startHookFun(hookFunAndArgsI interface{}) {
 	hookFunAndArgs := hookFunAndArgsI.(HookFunResultChAndArgs)
 	result := hookFunAndArgs.HookFun(hookFunAndArgs.Packet)
 	if result != nil {
-		if ret, ok := r.ResultChs.Load(hookFunAndArgs.Name); ok {
-			resultCh := ret.(chan interface{})
-			for len(resultCh) == MAX_RESULT_CHANNEL_SIZE {
-				time.Sleep(3 * time.Second)
-			}
-			resultCh <- result
+		for len(hookFunAndArgs.ResultCh) == MAX_RESULT_CHANNEL_SIZE {
+			time.Sleep(3 * time.Second)
 		}
+		hookFunAndArgs.ResultCh <- result
 	}
 }
 
@@ -88,15 +85,11 @@ func (r *Receiver) recv(packets interface{}) {
 }
 
 func (r *Receiver) Register(name string, hookFun func(gopacket.Packet) interface{}) chan interface{} {
-	r.ResultChs.Load(name)
-	if _, ok := r.ResultChs.Load(name); !ok {
-		r.Lock.Lock()
-		defer r.Lock.Unlock()
-		r.ResultChs.Store(name, make(chan interface{}, MAX_RESULT_CHANNEL_SIZE))
-		r.HookFuns.Store(name, hookFun)
-	}
-	ret, _ := r.ResultChs.Load(name)
-	return ret.(chan interface{})
+	ret, _ := r.HookFunAndResultChs.LoadOrStore(name, HookFunAndResultCh{
+		HookFun:  hookFun,
+		ResultCh: make(chan interface{}, MAX_RESULT_CHANNEL_SIZE),
+	})
+	return ret.(HookFunAndResultCh).ResultCh
 }
 
 func (r *Receiver) Unregister(name string) {
