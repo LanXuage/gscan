@@ -55,6 +55,7 @@ clean:
 
 wheel:
 	echo "Compiling wheel"
+	cp -r bin gscan
 	chmod +x bin/gscan-*
 	sed -i "s/__version__\s*=\s*'[0-9\.]*'/__version__ = '${VERSION}'/g" gscan/__version__.py
 	pip install wheel setuptools build twine

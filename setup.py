@@ -12,5 +12,6 @@ bin_files.extend(linux)
 bin_files.extend(darwin)
 
 setup(
-    scripts=bin_files,
+    packages=["gscan"],
+    package_data={"gscan": bin_files},
 )
