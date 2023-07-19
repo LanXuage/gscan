@@ -14,8 +14,8 @@ def main():
             arch = "386"
     cmd = ["gscan-" + platform.system().lower() + "-" + arch]
     cmd.extend(sys.argv[1:])
-    print(subprocess.call(cmd, shell=False))
+    return subprocess.call(cmd, shell=False)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

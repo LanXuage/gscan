@@ -12,5 +12,5 @@ bin_files.extend(linux)
 bin_files.extend(darwin)
 
 setup(
-    data_files=[("bin/", bin_files)],
+    scripts=bin_files,
 )
