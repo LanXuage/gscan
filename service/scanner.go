@@ -22,13 +22,13 @@ import (
 
 type ServiceResult struct {
 	port.TCPResult
-	CPE string
+	CPE      string
 	Protocol string
 }
 
 type ServiceInfo struct {
-	Conn   net.Conn
-	Banner []byte
+	Conn       net.Conn
+	Banner     []byte
 	HasMatched bool
 }
 
@@ -80,27 +80,17 @@ func (s *ServiceScanner) sendAndMatch(data interface{}) {
 		logger.Debug("sendAndMatch2", zap.Any("isNotScaned", isNotScaned))
 	}
 	logger.Debug("sendAndMatch", zap.Any("isNotScaned", isNotScaned))
-	switch target.Rule.RuleType {
-	case GSRULE_TYPE_TCP:
-		s._sendAndMatch("tcp", target, isNotScaned)
-	case GSRULE_TYPE_UDP:
-		s._sendAndMatch("udp", target, isNotScaned)
-	case GSRULE_TYPE_TCP_MUX:
-		s._sendAndMatchMux("tcp", target, isNotScaned)
-	case GSRULE_TYPE_UDP_MUX:
-		s._sendAndMatchMux("udp", target, isNotScaned)
-	}
+	s._sendAndMatch("tcp", target, isNotScaned)
 }
 
 func (s *ServiceScanner) _sendAndMatch(network string, target *ServiceTarget, isNotScaned bool) {
-
-}
-
-func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget, isNotScaned bool) {
 	logger.Debug("_sendAndMatchMux", zap.Any("target", target), zap.Any("isNotScaned", isNotScaned))
 	ipInfo, _ := s.Services.Get(target.IP)
 	serviceInfo, _ := ipInfo.Get(target.Port)
-	if isNotScaned {
+	if isNotScaned || target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_TCP {
+		if serviceInfo.Conn != nil {
+			serviceInfo.Conn.Close()
+		}
 		logger.Debug("connect to", zap.Any("target", target.IP.String()+":"+strconv.Itoa(int(target.Port))))
 		conn, err := net.Dial(network, target.IP.String()+":"+strconv.Itoa(int(target.Port)))
 		if err != nil {
@@ -116,11 +106,7 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 		}
 		logger.Debug("recv", zap.Any("banner", banner))
 		serviceInfo.Conn = conn
-		if len(banner) != 0 {
-			serviceInfo.Banner = banner
-		} else {
-			serviceInfo.Banner = []byte{}
-		}
+		serviceInfo.Banner = banner
 		ipInfo.Set(target.Port, serviceInfo)
 	}
 	for serviceInfo.Banner == nil {
@@ -168,6 +154,17 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 					}
 				}
 			}
+		case GSRULE_DATA_TYPE_SEND:
+			serviceInfo.Conn.Write(ruleItem.Data)
+			data := []byte{}
+			buf := make([]byte, 4096)
+			count, err := serviceInfo.Conn.Read(buf)
+			data = append(data, buf[0:count]...)
+			for err == nil && count == len(buf) {
+				count, err = serviceInfo.Conn.Read(buf)
+				data = append(data, buf[0:count]...)
+			}
+			env.LastResp = data
 		case GSRULE_DATA_TYPE_PROTOCOL:
 			serviceResult.Protocol = string(ruleItem.Data)
 		case GSRULE_DATA_TYPE_CPE23:
@@ -199,6 +196,7 @@ func (s *ServiceScanner) _sendAndMatchMux(network string, target *ServiceTarget,
 			serviceResult.CPE = cpe.String()
 		}
 	}
+	logger.Debug("s", zap.Any("env", env))
 	logger.Debug("s", zap.Any("s", serviceResult))
 	s.ResultCh <- serviceResult
 }
