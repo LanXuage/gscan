@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"crypto/tls"
 	"math/rand"
 	"net"
 	"net/netip"
@@ -9,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"crypto/tls"
 
 	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
@@ -30,7 +30,7 @@ type ServiceResult struct {
 type ServiceInfo struct {
 	Conn       net.Conn
 	Banner     []byte
-	RespMap      cmap.ConcurrentMap[string, []byte]
+	RespMap    cmap.ConcurrentMap[string, []byte]
 	IsTLS      bool
 	HasMatched bool
 }
@@ -99,20 +99,20 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 		network = "udp"
 	}
 	if isNotScaned || target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_TCP {
-		targetAddr := target.IP.String()+":"+strconv.Itoa(int(target.Port))
+		targetAddr := target.IP.String() + ":" + strconv.Itoa(int(target.Port))
 		logger.Debug("connect to", zap.Any("target", targetAddr))
-		// try TLS 
+		// try TLS
 		var conn net.Conn
 		var err error
 		if serviceInfo.Conn != nil {
 			serviceInfo.Conn.Close()
 			if serviceInfo.IsTLS {
-				conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true,})
+				conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true})
 			} else {
 				conn, err = net.Dial(network, targetAddr)
 			}
 		} else {
-			conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true,})
+			conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true})
 			if err != nil {
 				conn, err = net.Dial(network, targetAddr)
 			} else {
@@ -120,21 +120,21 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 			}
 		}
 		if err != nil {
-			logger.Error("net.Dial", zap.Error(err))
+			logger.Debug("net.Dial", zap.Error(err))
 			return
 		}
 		banner := []byte{}
 		logger.Debug("recv", zap.Any("len", len(target.Rule.Items)), zap.Any("dataType", target.Rule.Items[0].DataType))
-		if len(target.Rule.Items) > 0 && target.Rule.Items[0].DataType == GSRULE_DATA_TYPE_MATCH {
-			buf := make([]byte, 4096)
-			count, err := conn.Read(buf)
+		buf := make([]byte, 4096)
+		conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+		count, err := conn.Read(buf)
+		banner = append(banner, buf[0:count]...)
+		for err == nil && count == len(buf) {
+			conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+			count, err = conn.Read(buf)
 			banner = append(banner, buf[0:count]...)
-			for err == nil && count == len(buf) {
-				count, err = conn.Read(buf)
-				banner = append(banner, buf[0:count]...)
-			}
-			logger.Debug("recv", zap.Any("banner", banner))
 		}
+		logger.Debug("recv", zap.Any("banner", banner))
 		serviceInfo.Conn = conn
 		serviceInfo.Banner = banner
 		ipInfo.Set(target.Port, serviceInfo)
@@ -185,28 +185,34 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 				}
 			}
 		case GSRULE_DATA_TYPE_SEND:
+			serviceInfo.Conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
 			serviceInfo.Conn.Write(ruleItem.Data)
 			data := []byte{}
 			buf := make([]byte, 4096)
+			serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 			count, err := serviceInfo.Conn.Read(buf)
 			data = append(data, buf[0:count]...)
 			for err == nil && count == len(buf) {
+				serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				count, err = serviceInfo.Conn.Read(buf)
 				data = append(data, buf[0:count]...)
 			}
 			env.LastResp = data
 		case GSRULE_DATA_TYPE_SEND_MUX:
 			key := string(common.Bytes2Runes(ruleItem.Data))
-			data, ok := serviceInfo.RespMap.Get(key); 
+			data, ok := serviceInfo.RespMap.Get(key)
 			if !ok {
+				serviceInfo.Conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
 				n, err := serviceInfo.Conn.Write(ruleItem.Data)
 				logger.Debug("send", zap.Any("err", err), zap.Any("n", n))
 				data = []byte{}
 				buf := make([]byte, 4096)
+				serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				count, err := serviceInfo.Conn.Read(buf)
 				logger.Debug("read", zap.Any("buf", buf[0:count]))
 				data = append(data, buf[0:count]...)
 				for err == nil && count == len(buf) {
+					serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 					count, err = serviceInfo.Conn.Read(buf)
 					data = append(data, buf[0:count]...)
 				}
@@ -216,7 +222,7 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 			logger.Debug("GSRULE_DATA_TYPE_SEND_MUX", zap.Any("key", key), zap.Any("lastResp", env.LastResp))
 		case GSRULE_DATA_TYPE_PROTOCOL:
 			if serviceInfo.IsTLS {
-				serviceResult.Protocol = "tls("+string(ruleItem.Data)+")"
+				serviceResult.Protocol = "tls(" + string(ruleItem.Data) + ")"
 			} else {
 				serviceResult.Protocol = string(ruleItem.Data)
 			}
