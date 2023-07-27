@@ -106,5 +106,27 @@ func getRules() *[]GScanRule {
 				},
 			},
 		},
+		{
+			Version:0,
+			RuleType: GSRULE_TYPE_TCP,
+			Items: []GScanRuleItem{
+				{
+					DataType: GSRULE_DATA_TYPE_SEND_MUX,
+					Data: []byte{71, 69, 84, 32, 47, 32, 72, 84, 84, 80, 47, 49, 46, 48, 13, 10, 13, 10},
+				},
+				{
+					DataType: GSRULE_DATA_TYPE_MATCH,
+					Data: []byte{83, 101, 114, 118, 101, 114, 92, 115, 42, 63, 58, 92, 115, 42, 63, 110, 103, 105, 110, 120, 92, 47, 40, 63, 80, 60, 118, 101, 114, 115, 105, 111, 110, 62, 92, 100, 43, 63, 40, 63, 58, 92, 46, 92, 100, 43, 63, 41, 42, 63, 41, 91, 94, 92, 100, 92, 46, 93},
+				},
+				{
+					DataType: GSRULE_DATA_TYPE_PROTOCOL,
+					Data: []byte{104, 116, 116, 112},
+				},
+				{
+					DataType: GSRULE_DATA_TYPE_CPE23,
+					Data: []byte{97, 58, 102, 53, 58, 110, 103, 105, 110, 120, 58, 60, 118, 101, 114, 115, 105, 111, 110, 62},
+				},
+			},
+		},
 	}
 }

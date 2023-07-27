@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"crypto/tls"
 
 	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
@@ -29,6 +30,8 @@ type ServiceResult struct {
 type ServiceInfo struct {
 	Conn       net.Conn
 	Banner     []byte
+	RespMap      cmap.ConcurrentMap[string, []byte]
+	IsTLS      bool
 	HasMatched bool
 }
 
@@ -64,7 +67,9 @@ func (s *ServiceScanner) sendAndMatch(data interface{}) {
 	isNotScaned := false
 	if ipInfo, ok := s.Services.Get(target.IP); ok {
 		logger.Debug("sendAndMatch1", zap.Any("isNotScaned", isNotScaned))
-		isNotScaned = ipInfo.SetIfAbsent(target.Port, ServiceInfo{})
+		isNotScaned = ipInfo.SetIfAbsent(target.Port, ServiceInfo{
+			RespMap: cmap.New[[]byte](),
+		})
 		logger.Debug("sendAndMatch1", zap.Any("isNotScaned", isNotScaned))
 		if !isNotScaned {
 			serviceInfo, _ := ipInfo.Get(target.Port)
@@ -73,38 +78,63 @@ func (s *ServiceScanner) sendAndMatch(data interface{}) {
 			}
 		}
 	} else {
-		serviceInfo := cmap.NewWithCustomShardingFunction[layers.TCPPort, ServiceInfo](func(key layers.TCPPort) uint32 { return uint32(key) })
-		serviceInfo.Set(target.Port, ServiceInfo{})
+		ipInfo := cmap.NewWithCustomShardingFunction[layers.TCPPort, ServiceInfo](func(key layers.TCPPort) uint32 { return uint32(key) })
+		ipInfo.Set(target.Port, ServiceInfo{
+			RespMap: cmap.New[[]byte](),
+		})
 		logger.Debug("sendAndMatch2", zap.Any("isNotScaned", isNotScaned))
-		isNotScaned = s.Services.SetIfAbsent(target.IP, serviceInfo)
+		isNotScaned = s.Services.SetIfAbsent(target.IP, ipInfo)
 		logger.Debug("sendAndMatch2", zap.Any("isNotScaned", isNotScaned))
 	}
 	logger.Debug("sendAndMatch", zap.Any("isNotScaned", isNotScaned))
-	s._sendAndMatch("tcp", target, isNotScaned)
+	s._sendAndMatch(target, isNotScaned)
 }
 
-func (s *ServiceScanner) _sendAndMatch(network string, target *ServiceTarget, isNotScaned bool) {
+func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) {
 	logger.Debug("_sendAndMatchMux", zap.Any("target", target), zap.Any("isNotScaned", isNotScaned))
 	ipInfo, _ := s.Services.Get(target.IP)
 	serviceInfo, _ := ipInfo.Get(target.Port)
+	network := "tcp"
+	if target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_UDP_MUX {
+		network = "udp"
+	}
 	if isNotScaned || target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_TCP {
+		targetAddr := target.IP.String()+":"+strconv.Itoa(int(target.Port))
+		logger.Debug("connect to", zap.Any("target", targetAddr))
+		// try TLS 
+		var conn net.Conn
+		var err error
 		if serviceInfo.Conn != nil {
 			serviceInfo.Conn.Close()
+			if serviceInfo.IsTLS {
+				conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true,})
+			} else {
+				conn, err = net.Dial(network, targetAddr)
+			}
+		} else {
+			conn, err = tls.Dial(network, targetAddr, &tls.Config{InsecureSkipVerify: true,})
+			if err != nil {
+				conn, err = net.Dial(network, targetAddr)
+			} else {
+				serviceInfo.IsTLS = true
+			}
 		}
-		logger.Debug("connect to", zap.Any("target", target.IP.String()+":"+strconv.Itoa(int(target.Port))))
-		conn, err := net.Dial(network, target.IP.String()+":"+strconv.Itoa(int(target.Port)))
 		if err != nil {
 			logger.Error("net.Dial", zap.Error(err))
+			return
 		}
 		banner := []byte{}
-		buf := make([]byte, 4096)
-		count, err := conn.Read(buf)
-		banner = append(banner, buf[0:count]...)
-		for err == nil && count == len(buf) {
-			count, err = conn.Read(buf)
+		logger.Debug("recv", zap.Any("len", len(target.Rule.Items)), zap.Any("dataType", target.Rule.Items[0].DataType))
+		if len(target.Rule.Items) > 0 && target.Rule.Items[0].DataType == GSRULE_DATA_TYPE_MATCH {
+			buf := make([]byte, 4096)
+			count, err := conn.Read(buf)
 			banner = append(banner, buf[0:count]...)
+			for err == nil && count == len(buf) {
+				count, err = conn.Read(buf)
+				banner = append(banner, buf[0:count]...)
+			}
+			logger.Debug("recv", zap.Any("banner", banner))
 		}
-		logger.Debug("recv", zap.Any("banner", banner))
 		serviceInfo.Conn = conn
 		serviceInfo.Banner = banner
 		ipInfo.Set(target.Port, serviceInfo)
@@ -165,8 +195,31 @@ func (s *ServiceScanner) _sendAndMatch(network string, target *ServiceTarget, is
 				data = append(data, buf[0:count]...)
 			}
 			env.LastResp = data
+		case GSRULE_DATA_TYPE_SEND_MUX:
+			key := string(common.Bytes2Runes(ruleItem.Data))
+			data, ok := serviceInfo.RespMap.Get(key); 
+			if !ok {
+				n, err := serviceInfo.Conn.Write(ruleItem.Data)
+				logger.Debug("send", zap.Any("err", err), zap.Any("n", n))
+				data = []byte{}
+				buf := make([]byte, 4096)
+				count, err := serviceInfo.Conn.Read(buf)
+				logger.Debug("read", zap.Any("buf", buf[0:count]))
+				data = append(data, buf[0:count]...)
+				for err == nil && count == len(buf) {
+					count, err = serviceInfo.Conn.Read(buf)
+					data = append(data, buf[0:count]...)
+				}
+				serviceInfo.RespMap.SetIfAbsent(key, data)
+			}
+			env.LastResp = data
+			logger.Debug("GSRULE_DATA_TYPE_SEND_MUX", zap.Any("key", key), zap.Any("lastResp", env.LastResp))
 		case GSRULE_DATA_TYPE_PROTOCOL:
-			serviceResult.Protocol = string(ruleItem.Data)
+			if serviceInfo.IsTLS {
+				serviceResult.Protocol = "tls("+string(ruleItem.Data)+")"
+			} else {
+				serviceResult.Protocol = string(ruleItem.Data)
+			}
 		case GSRULE_DATA_TYPE_CPE23:
 			// https://csrc.nist.gov/projects/security-content-automation-protocol/specifications/cpe
 			// cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
