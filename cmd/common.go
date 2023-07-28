@@ -38,7 +38,12 @@ func ParseAddr(s string) ([]netip.Addr, error) {
 	} else {
 		ret := []netip.Addr{}
 		for _, ip := range ips {
-			addr, _ := netip.AddrFromSlice(ip)
+			var addr netip.Addr
+			if ipv4 := ip.To4(); ipv4 == nil {
+				addr, _ = netip.AddrFromSlice(ip)
+			} else {
+				addr, _ = netip.AddrFromSlice(ipv4)
+			}
 			ret = append(ret, addr)
 		}
 		return ret, nil

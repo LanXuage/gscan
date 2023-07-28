@@ -9,30 +9,29 @@ import (
 	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
 	"github.com/LanXuage/gscan/port"
+	"github.com/LanXuage/gscan/service"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 var (
-	portCmd = &cobra.Command{
-		Use:   "port",
-		Short: "PORT Scanner",
+	serviceCmd = &cobra.Command{
+		Use:   "service",
+		Short: "Service Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tcpScanner := port.GetTCPScanner()
-			// defer tcpScanner.Close()
+			serviceScanner := service.GetServiceScanner()
 			arpScanner := arp.GetARPScanner()
-			// defer arpScanner.Close()
 			start := time.Now()
 			fmt.Printf("%-39s ", "IP")
 			if withARP {
 				fmt.Printf("%-17s %-73s ", "MAC", "VENDOR")
 			}
-			fmt.Printf("%-24s %-5s\n", "PORT", "STATE")
+			fmt.Printf("%-24s %-5s\n", "PORT", "PROTOCOL")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			tcpScanner.Timeout = time.Millisecond * time.Duration(timeout)
+			serviceScanner.Timeout = time.Millisecond * time.Duration(timeout)
 			if timeout > 2000 {
 				arpScanner.Timeout = 2000 * time.Microsecond
 			} else {
@@ -43,8 +42,8 @@ var (
 			if len(hosts) == 0 {
 				all, _ := cmd.Flags().GetBool("all")
 				if all {
-					timeoutCh := tcpScanner.ScanLocalNet()
-					normalPrintfTCP(timeoutCh, tcpScanner.ResultCh)
+					timeoutCh := serviceScanner.ScanLocalNet()
+					normalPrintfService(timeoutCh, serviceScanner.ResultCh)
 				} else {
 					cmd.Help()
 				}
@@ -61,15 +60,14 @@ var (
 					}
 				}
 			}
-			tcpScanner.UseFullTCP, _ = cmd.Flags().GetBool("full")
 			ports, _ := cmd.Flags().GetStringArray("port")
 			if len(ports) != 0 {
-				tcpScanner.PortScanType = port.CUSTOM_PORTS
+				serviceScanner.PortScanType = port.CUSTOM_PORTS
 				for _, port := range ports {
 					tmp, _ := ParsePort(port)
-					tcpScanner.Ports = append(tcpScanner.Ports, tmp...)
+					serviceScanner.Ports = append(serviceScanner.Ports, tmp...)
 				}
-				logger.Debug("runE", zap.Any("ports", tcpScanner.Ports))
+				logger.Debug("runE", zap.Any("ports", serviceScanner.Ports))
 			}
 			ips := []netip.Addr{}
 			for _, host := range hosts {
@@ -83,22 +81,23 @@ var (
 						}
 					} else {
 						logger.Debug("runE", zap.Any("prefix", prefix))
-						timeoutCh := tcpScanner.ScanPrefix(prefix)
-						normalPrintfTCP(timeoutCh, tcpScanner.ResultCh)
+						timeoutCh := serviceScanner.ScanPrefix(prefix)
+						normalPrintfService(timeoutCh, serviceScanner.ResultCh)
 					}
 				} else {
-					ips = append(ips, ip)
+					timeoutCh := serviceScanner.ScanMany([]netip.Addr{ip})
+					normalPrintfService(timeoutCh, serviceScanner.ResultCh)
 				}
 			}
-			timeoutCh := tcpScanner.ScanMany(ips)
-			normalPrintfTCP(timeoutCh, tcpScanner.ResultCh)
+			timeoutCh := serviceScanner.ScanMany(ips)
+			normalPrintfService(timeoutCh, serviceScanner.ResultCh)
 			fmt.Printf("Cost: %v\n", time.Since(start))
 			return nil
 		},
 	}
 )
 
-func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
+func normalPrintfService(timeoutCh chan struct{}, resultCh chan *service.ServiceResult) {
 	for {
 		select {
 		case result := <-resultCh:
@@ -117,7 +116,7 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 				}
 				fmt.Printf("%-17v %-73s ", h, vendor)
 			}
-			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, "open")
+			fmt.Printf("%s/%-20v %-5s\n", "tcp", result.Port, result.Protocol)
 		case <-timeoutCh:
 			return
 		}
@@ -125,10 +124,8 @@ func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
 }
 
 func init() {
-	rootCmd.AddCommand(portCmd)
-	portCmd.Flags().StringArrayP("host", "h", []string{}, "host, domain or cidr to scan")
-	portCmd.Flags().BoolP("all", "a", false, "to scan all localnet")
-	portCmd.Flags().BoolP("udp", "u", false, "to scan udp")
-	portCmd.Flags().BoolP("full", "f", false, "to scan by full tcp connect")
-	portCmd.Flags().StringArrayP("port", "p", []string{}, "port to scan")
+	rootCmd.AddCommand(serviceCmd)
+	serviceCmd.Flags().StringArrayP("host", "h", []string{}, "host, domain or cidr to scan")
+	serviceCmd.Flags().BoolP("all", "a", false, "to scan all localnet")
+	serviceCmd.Flags().StringArrayP("port", "p", []string{}, "port to scan")
 }

@@ -48,3 +48,19 @@ func BenchmarkCheckIPisIPNet(b *testing.B) {
 		common.CheckIPisIPNet(ip, outIp, mask)
 	}
 }
+
+func TestRunesAndBytes(t *testing.T) {
+	b := []byte{0xff, 0xfe, 0x34, 0x6a, 0x64}
+	r := common.Bytes2Runes(b)
+	ba := common.Runes2Bytes(r)
+	t.Log(b)
+	t.Log(r)
+	t.Log(ba)
+	for _, i := range string(b) {
+		t.Log(i)
+	}
+	t.Log("=====")
+	for _, i := range string(r) {
+		t.Log(i)
+	}
+}

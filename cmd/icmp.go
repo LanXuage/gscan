@@ -18,7 +18,7 @@ var (
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			icmpScanner := icmp.GetICMPScanner()
-			defer icmpScanner.Close()
+			// defer icmpScanner.Close()
 			logger := common.GetLogger()
 			start := time.Now()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
