@@ -126,11 +126,10 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 		banner := []byte{}
 		logger.Debug("recv", zap.Any("len", len(target.Rule.Items)), zap.Any("dataType", target.Rule.Items[0].DataType))
 		buf := make([]byte, 4096)
-		conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+		conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
 		count, err := conn.Read(buf)
 		banner = append(banner, buf[0:count]...)
 		for err == nil && count == len(buf) {
-			conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 			count, err = conn.Read(buf)
 			banner = append(banner, buf[0:count]...)
 		}
@@ -185,15 +184,14 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 				}
 			}
 		case GSRULE_DATA_TYPE_SEND:
-			serviceInfo.Conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
+			serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout/2))
 			serviceInfo.Conn.Write(ruleItem.Data)
 			data := []byte{}
 			buf := make([]byte, 4096)
-			serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+			serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
 			count, err := serviceInfo.Conn.Read(buf)
 			data = append(data, buf[0:count]...)
 			for err == nil && count == len(buf) {
-				serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				count, err = serviceInfo.Conn.Read(buf)
 				data = append(data, buf[0:count]...)
 			}
@@ -202,17 +200,16 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 			key := string(common.Bytes2Runes(ruleItem.Data))
 			data, ok := serviceInfo.RespMap.Get(key)
 			if !ok {
-				serviceInfo.Conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
+				serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout/2))
 				n, err := serviceInfo.Conn.Write(ruleItem.Data)
 				logger.Debug("send", zap.Any("err", err), zap.Any("n", n))
 				data = []byte{}
 				buf := make([]byte, 4096)
-				serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+				serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
 				count, err := serviceInfo.Conn.Read(buf)
 				logger.Debug("read", zap.Any("buf", buf[0:count]))
 				data = append(data, buf[0:count]...)
 				for err == nil && count == len(buf) {
-					serviceInfo.Conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 					count, err = serviceInfo.Conn.Read(buf)
 					data = append(data, buf[0:count]...)
 				}
@@ -376,7 +373,7 @@ func newServiceScanner() *ServiceScanner {
 	s := &ServiceScanner{
 		TargetCh:     make(chan *ServiceTarget, 10),
 		ResultCh:     make(chan *ServiceResult, 10),
-		Timeout:      3 * time.Second,
+		Timeout:      6 * time.Second,
 		Services:     cmap.NewWithCustomShardingFunction[netip.Addr, cmap.ConcurrentMap[layers.TCPPort, ServiceInfo]](common.Fnv32),
 		reCache:      cmap.New[regexp.Regexp](),
 		PortScanType: port.DEFAULT_PORTS,
