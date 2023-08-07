@@ -42,18 +42,18 @@ type Target struct {
 
 func newARPScanner() *ARPScanner {
 	a := &ARPScanner{
-		Stop: make(chan struct{}),
 		Opts: gopacket.SerializeOptions{
 			FixLengths:       true,
 			ComputeChecksums: true,
 		},
-		Timeout:  3 * time.Second,
-		OMap:     *common.GetOui(),
-		AHMap:    cmap.NewWithCustomShardingFunction[netip.Addr, net.HardwareAddr](common.Fnv32),
-		Ifaces:   common.GetActiveInterfaces(),
-		Ifas:     common.GetActiveIfaces(),
-		TargetCh: make(chan *Target, 10),
-		ResultCh: make(chan *ARPScanResult, 10),
+		OMap:  common.GetOui(),
+		AHMap: cmap.NewWithCustomShardingFunction[netip.Addr, net.HardwareAddr](common.Fnv32),
+		Ifas:  common.GetActiveIfaces(),
+		Scanner: common.Scanner{
+			Timeout:  3 * time.Second,
+			TargetCh: make(chan interface{}, 10),
+			ResultCh: make(chan interface{}, 10),
+		},
 	}
 	go a.Recv()
 	go a.Scan()
@@ -76,7 +76,7 @@ func newARPScanner() *ARPScanner {
 		for {
 			select {
 			case res := <-a.ResultCh:
-				if iface.Gateway == res.IP {
+				if iface.Gateway == res.(*ARPScanResult).IP {
 					break L1
 				}
 			case <-timeoutCh:

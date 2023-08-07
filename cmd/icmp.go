@@ -40,17 +40,17 @@ var (
 						logger.Debug("icmp", zap.Any("ip", ip))
 						ipList := []netip.Addr{}
 						ipList = append(ipList, ip)
-						timeoutCh := icmpScanner.ScanList(ipList)
+						timeoutCh := icmpScanner.ScanMany(ipList)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 					if prefix, err := netip.ParsePrefix(host); err == nil {
 						logger.Debug("runE", zap.Any("prefix", prefix))
-						timeoutCh := icmpScanner.ScanListByPrefix(prefix)
+						timeoutCh := icmpScanner.ScanPrefix(prefix)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 					if ips, err := ParseAddr(host); err == nil {
 						logger.Debug("runE", zap.Any("ips", ips))
-						timeoutCh := icmpScanner.ScanList(ips)
+						timeoutCh := icmpScanner.ScanMany(ips)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 				}
@@ -62,12 +62,12 @@ var (
 	}
 )
 
-func icmpPrintf(timeoutCh chan struct{}, resultCh chan *icmp.ICMPScanResult) {
+func icmpPrintf(timeoutCh chan struct{}, resultCh chan interface{}) {
 	for {
 		select {
 		case result := <-resultCh:
-			if result.IsActive {
-				fmt.Printf("%s\t\tAlive\n", result.IP)
+			if result.(icmp.ICMPScanResult).IsActive {
+				fmt.Printf("%s\t\tAlive\n", result.(icmp.ICMPScanResult).IP)
 			}
 		case <-timeoutCh:
 			return

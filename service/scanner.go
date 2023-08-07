@@ -38,7 +38,7 @@ type ServiceInfo struct {
 type ServiceTarget struct {
 	IP   netip.Addr
 	Port layers.TCPPort
-	Rule GScanRule
+	Rule common.GScanRule
 }
 
 type ServiceScanner struct {
@@ -95,10 +95,10 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 	ipInfo, _ := s.Services.Get(target.IP)
 	serviceInfo, _ := ipInfo.Get(target.Port)
 	network := "tcp"
-	if target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_UDP_MUX {
+	if target.Rule.RuleType == common.GSRULE_TYPE_UDP || target.Rule.RuleType == common.GSRULE_TYPE_UDP_MUX {
 		network = "udp"
 	}
-	if isNotScaned || target.Rule.RuleType == GSRULE_TYPE_UDP || target.Rule.RuleType == GSRULE_TYPE_TCP {
+	if isNotScaned || target.Rule.RuleType == common.GSRULE_TYPE_UDP || target.Rule.RuleType == common.GSRULE_TYPE_TCP {
 		targetAddr := target.IP.String() + ":" + strconv.Itoa(int(target.Port))
 		logger.Debug("connect to", zap.Any("target", targetAddr))
 		// try TLS
@@ -126,7 +126,7 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 		banner := []byte{}
 		logger.Debug("recv", zap.Any("len", len(target.Rule.Items)), zap.Any("dataType", target.Rule.Items[0].DataType))
 		buf := make([]byte, 4096)
-		conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
+		conn.SetReadDeadline(time.Now().Add(s.Timeout / 2))
 		count, err := conn.Read(buf)
 		banner = append(banner, buf[0:count]...)
 		for err == nil && count == len(buf) {
@@ -158,7 +158,7 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 	}
 	for _, ruleItem := range (*target).Rule.Items {
 		switch ruleItem.DataType {
-		case GSRULE_DATA_TYPE_MATCH:
+		case common.GSRULE_DATA_TYPE_MATCH:
 			reStr := string(common.Bytes2Runes(ruleItem.Data))
 			logger.Debug("reStr", zap.Any("reStr", reStr))
 			r, ok := s.reCache.Get(reStr)
@@ -183,12 +183,12 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 					}
 				}
 			}
-		case GSRULE_DATA_TYPE_SEND:
-			serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout/2))
+		case common.GSRULE_DATA_TYPE_SEND:
+			serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout / 2))
 			serviceInfo.Conn.Write(ruleItem.Data)
 			data := []byte{}
 			buf := make([]byte, 4096)
-			serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
+			serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout / 2))
 			count, err := serviceInfo.Conn.Read(buf)
 			data = append(data, buf[0:count]...)
 			for err == nil && count == len(buf) {
@@ -196,16 +196,16 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 				data = append(data, buf[0:count]...)
 			}
 			env.LastResp = data
-		case GSRULE_DATA_TYPE_SEND_MUX:
+		case common.GSRULE_DATA_TYPE_SEND_MUX:
 			key := string(common.Bytes2Runes(ruleItem.Data))
 			data, ok := serviceInfo.RespMap.Get(key)
 			if !ok {
-				serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout/2))
+				serviceInfo.Conn.SetWriteDeadline(time.Now().Add(s.Timeout / 2))
 				n, err := serviceInfo.Conn.Write(ruleItem.Data)
 				logger.Debug("send", zap.Any("err", err), zap.Any("n", n))
 				data = []byte{}
 				buf := make([]byte, 4096)
-				serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout/2))
+				serviceInfo.Conn.SetReadDeadline(time.Now().Add(s.Timeout / 2))
 				count, err := serviceInfo.Conn.Read(buf)
 				logger.Debug("read", zap.Any("buf", buf[0:count]))
 				data = append(data, buf[0:count]...)
@@ -217,13 +217,13 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 			}
 			env.LastResp = data
 			logger.Debug("GSRULE_DATA_TYPE_SEND_MUX", zap.Any("key", key), zap.Any("lastResp", env.LastResp))
-		case GSRULE_DATA_TYPE_PROTOCOL:
+		case common.GSRULE_DATA_TYPE_PROTOCOL:
 			if serviceInfo.IsTLS {
 				serviceResult.Protocol = "tls(" + string(ruleItem.Data) + ")"
 			} else {
 				serviceResult.Protocol = string(ruleItem.Data)
 			}
-		case GSRULE_DATA_TYPE_CPE23:
+		case common.GSRULE_DATA_TYPE_CPE23:
 			// https://csrc.nist.gov/projects/security-content-automation-protocol/specifications/cpe
 			// cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
 			fmtStr := string(common.Bytes2Runes(ruleItem.Data))

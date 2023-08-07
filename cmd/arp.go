@@ -59,7 +59,7 @@ var (
 			}
 			if len(ips) > 0 {
 				timeoutCh := arpScanner.ScanMany(ips)
-				normalPrintf(timeoutCh, arpScanner.ResultCh)
+				normalPrintf(timeoutCh, arpScanner.Scanner.ResultCh)
 			}
 			fmt.Printf("Cost: %v\n", time.Since(start))
 			return nil
@@ -67,11 +67,12 @@ var (
 	}
 )
 
-func normalPrintf(timeoutCh chan struct{}, resultCh chan *arp.ARPScanResult) {
+func normalPrintf(timeoutCh chan struct{}, resultCh chan interface{}) {
 	for {
 		select {
 		case result := <-resultCh:
-			fmt.Printf("%-39s %-17v %-73s\n", result.IP, result.Mac, result.Vendor)
+			arpResult := result.(*arp.ARPScanResult)
+			fmt.Printf("%-39s %-17v %-73s\n", arpResult.IP, arpResult.Mac, arpResult.Vendor)
 		case <-timeoutCh:
 			return
 		}

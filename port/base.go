@@ -14,6 +14,8 @@ import (
 var arpInstance = arp.GetARPScanner()
 var receiver = common.GetReceiver()
 
+var logger = common.GetLogger()
+
 const (
 	TCP_REGISTER_NAME       = "TCP"
 	UDPREGISTER_NAME        = "UDP"
