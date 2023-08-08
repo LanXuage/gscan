@@ -97,19 +97,21 @@ var (
 	}
 )
 
-func normalPrintfService(timeoutCh chan struct{}, resultCh chan *service.ServiceResult) {
+func normalPrintfService(timeoutCh chan struct{}, resultCh chan interface{}) {
+	arpScanner := arp.GetARPScanner()
 	for {
 		select {
-		case result := <-resultCh:
+		case tmp := <-resultCh:
+			result := tmp.(*service.ServiceResult)
 			fmt.Printf("%-39s ", result.IP)
 			if withARP {
 				var vendor any = ""
-				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
+				h, ok := arpScanner.Scanner.(*arp.ARPScanner).AHMap.Get(result.IP)
 				if ok {
 					prefix1, prefix2 := common.GetOuiPrefix(h)
-					vendor, ok = arp.GetARPScanner().OMap.Load(prefix2)
+					vendor, ok = arpScanner.Scanner.(*arp.ARPScanner).OMap.Load(prefix2)
 					if !ok {
-						vendor, _ = arp.GetARPScanner().OMap.Load(prefix1)
+						vendor, _ = arpScanner.Scanner.(*arp.ARPScanner).OMap.Load(prefix1)
 					}
 				} else {
 					h = net.HardwareAddr{}

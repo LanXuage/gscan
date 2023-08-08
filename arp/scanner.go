@@ -15,7 +15,7 @@ import (
 )
 
 type ARPScanner struct {
-	common.Scanner
+	common.IScanner
 	Opts  gopacket.SerializeOptions                        // 包序列化选项
 	Ifas  *[]common.GSIface                                // 可用接口列表
 	AHMap cmap.ConcurrentMap[netip.Addr, net.HardwareAddr] // 获取到的IP <-> Mac 映射表
@@ -23,11 +23,42 @@ type ARPScanner struct {
 }
 
 func (a *ARPScanner) Close() {
-	defer a.Scanner.Close()
 	defer receiver.Unregister(REGISTER_NAME)
 }
 
-func (a *ARPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {
+func (a *ARPScanner) Init(s *common.Scanner) {
+	go a.goRecv(s.ResultCh)
+	go a.goScan(s.TargetCh)
+	for _, iface := range *a.Ifas {
+		if iface.Gateway == iface.IP {
+			continue
+		}
+		s.TargetCh <- &Target{
+			SrcMac: iface.HWAddr,
+			SrcIP:  iface.IP,
+			DstIP:  iface.Gateway,
+			Handle: iface.Handle,
+		}
+		timeoutCh := make(chan struct{})
+		go func(timeoutCh chan struct{}, timeout time.Duration) {
+			defer close(timeoutCh)
+			time.Sleep(timeout)
+		}(timeoutCh, 6*time.Second)
+	L1:
+		for {
+			select {
+			case res := <-s.ResultCh:
+				if iface.Gateway == res.(*ARPScanResult).IP {
+					break L1
+				}
+			case <-timeoutCh:
+				logger.Panic("Get gateway's hardwareaddr failed. ", zap.Any("iface", iface))
+			}
+		}
+	}
+}
+
+func (a *ARPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GSIface, s *common.Scanner) {
 	for i := 0; i < 2; i++ {
 		nIP := prefix.Addr()
 		for {
@@ -42,13 +73,13 @@ func (a *ARPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GS
 							}
 						}
 						logger.Debug("generateTargetByPrefix", zap.Any("ret->mac", gh))
-						a.ResultCh <- &ARPScanResult{
+						s.ResultCh <- &ARPScanResult{
 							IP:     nIP,
 							Mac:    gh,
 							Vendor: vendor.(string),
 						}
 					} else {
-						a.TargetCh <- &Target{
+						s.TargetCh <- &Target{
 							SrcMac: iface.HWAddr,
 							SrcIP:  iface.IP,
 							DstIP:  nIP,
@@ -58,7 +89,7 @@ func (a *ARPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GS
 				} else if !nIP.IsValid() || !prefix.Contains(nIP) || !iface.Mask.Contains(nIP) {
 					break
 				} else {
-					a.TargetCh <- &Target{
+					s.TargetCh <- &Target{
 						SrcMac: iface.HWAddr,
 						SrcIP:  iface.IP,
 						DstIP:  nIP,
@@ -75,8 +106,7 @@ func (a *ARPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GS
 	}
 }
 
-func (a *ARPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface) {
-	logger.Info("bbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+func (a *ARPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface, s *common.Scanner) {
 	logger.Debug("so", zap.Any("ip", iface.Gateway))
 	if iface.Gateway == ip {
 		if gh, ok := a.AHMap.Get(iface.Gateway); ok {
@@ -88,7 +118,7 @@ func (a *ARPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface) {
 				}
 			}
 			logger.Debug("goScanMany", zap.Any("ret->mac", gh))
-			a.ResultCh <- &ARPScanResult{
+			s.ResultCh <- &ARPScanResult{
 				IP:     ip,
 				Mac:    gh,
 				Vendor: vendor.(string),
@@ -97,7 +127,7 @@ func (a *ARPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface) {
 		}
 	}
 	if iface.Mask.Contains(ip) {
-		a.TargetCh <- &Target{
+		s.TargetCh <- &Target{
 			SrcMac: iface.HWAddr,
 			SrcIP:  iface.IP,
 			DstIP:  ip,
@@ -106,35 +136,20 @@ func (a *ARPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface) {
 	}
 }
 
-// 执行全局域网扫描
-func (a *ARPScanner) ScanLocalNet() chan struct{} {
-	logger.Debug("Start Generate")
-	timeoutCh := make(chan struct{})
-	go a.goScanLocalNet(timeoutCh)
-	return timeoutCh
-}
-
-func (a *ARPScanner) goScanLocalNet(timeoutCh chan struct{}) {
-	defer a.WaitTimeout(timeoutCh)
-	for _, iface := range *common.GetActiveIfaces() {
-		a.GenerateTargetByPrefix(iface.Mask, iface)
-	}
-}
-
 // 接收协程
-func (a *ARPScanner) Recv() {
+func (a *ARPScanner) goRecv(resultCh chan interface{}) {
 	for r := range receiver.Register(REGISTER_NAME, a.RecvARP) {
 		if results, ok := r.(ARPScanResults); ok {
 			for _, result := range results.Results {
-				a.ResultCh <- result
+				resultCh <- result
 			}
 		}
 	}
 }
 
 // 扫描协程
-func (a *ARPScanner) Scan() {
-	for target := range a.TargetCh {
+func (a *ARPScanner) goScan(targetCh chan interface{}) {
+	for target := range targetCh {
 		a.SendARPReq(target.(*Target))
 	}
 }

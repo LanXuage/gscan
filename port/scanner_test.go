@@ -33,7 +33,7 @@ func TestHalfTCPLocalNet(t *testing.T) {
 
 func TestTCPLocalNet(t *testing.T) {
 	tcp := port.GetTCPScanner()
-	tcp.UseFullTCP = true
+	tcp.Scanner.(*port.TCPScanner).UseFullTCP = true
 	timeoutCh := tcp.ScanLocalNet()
 	for {
 		select {
@@ -76,8 +76,8 @@ func TestTCPLocalNetAllPorts(t *testing.T) {
 
 func TestScanIPs(t *testing.T) {
 	tcp := port.GetTCPScanner()
-	tcp.UseFullTCP = true
-	tcp.PortScanType = port.DEFAULT_PORTS
+	tcp.Scanner.(*port.TCPScanner).UseFullTCP = true
+	tcp.Scanner.(*port.TCPScanner).PortScanType = port.DEFAULT_PORTS
 	// tcp.PortScanType = port.ALL_PORTS
 	// tcp.Timeout = 100 * time.Second
 	timeoutCh := tcp.ScanMany(ips)

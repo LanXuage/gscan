@@ -42,19 +42,17 @@ type ServiceTarget struct {
 }
 
 type ServiceScanner struct {
-	TargetCh     chan *ServiceTarget
-	ResultCh     chan *ServiceResult
-	Timeout      time.Duration
+	common.IScanner
 	Workers      *ants.PoolWithFunc
 	Services     cmap.ConcurrentMap[netip.Addr, cmap.ConcurrentMap[layers.TCPPort, ServiceInfo]]
 	reCache      cmap.ConcurrentMap[string, regexp.Regexp]
 	PortScanType uint8
 	Ports        []layers.TCPPort
-	gCount       int64
-	sCount       int64
 }
 
-func (s *ServiceScanner) init() {
+func (s *ServiceScanner) Close() {}
+
+func (s *ServiceScanner) Init() {
 	p, err := ants.NewPoolWithFunc(10, s.sendAndMatch)
 	if err != nil {
 		logger.Error("Create func pool failed", zap.Error(err))
@@ -257,69 +255,8 @@ func (s *ServiceScanner) _sendAndMatch(target *ServiceTarget, isNotScaned bool) 
 	s.ResultCh <- serviceResult
 }
 
-func (s *ServiceScanner) waitTimeout(timeoutCh chan struct{}) {
-	defer close(timeoutCh)
-	for {
-		time.Sleep(time.Microsecond * 200)
-		if s.gCount == s.sCount && len(s.TargetCh) == 0 {
-			break
-		}
-	}
-	time.Sleep(s.Timeout)
-}
-
-func (s *ServiceScanner) goScanMany(targetIPs []netip.Addr, timeoutCh chan struct{}) {
-	defer s.waitTimeout(timeoutCh)
-	for _, targetIP := range targetIPs {
-		for _, iface := range *common.GetActiveIfaces() {
-			s.generateTarget(targetIP, iface)
-		}
-	}
-}
-
-func (s *ServiceScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface) {
-	for i := 0; i < 2; i++ {
-		nIp := prefix.Addr()
-		for {
-			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
-				if !nIp.IsValid() || !prefix.Contains(nIp) || !iface.Mask.Contains(nIp) {
-					break
-				} else {
-					s.generateTarget(nIp, iface)
-				}
-			}
-			if i == 1 {
-				nIp = nIp.Prev()
-			} else {
-				nIp = nIp.Next()
-			}
-		}
-	}
-}
-
-func (s *ServiceScanner) ScanMany(targetIPs []netip.Addr) chan struct{} {
-	timeoutCh := make(chan struct{})
-	go s.goScanMany(targetIPs, timeoutCh)
-	return timeoutCh
-}
-
-func (s *ServiceScanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
-	timeoutCh := make(chan struct{})
-	go s.goScanPrefix(prefix, timeoutCh)
-	return timeoutCh
-}
-
-func (s *ServiceScanner) goScanPrefix(prefix netip.Prefix, timeoutCh chan struct{}) {
-	defer s.waitTimeout(timeoutCh)
-	for _, iface := range *arpInstance.Ifas {
-		if iface.Mask.Contains(prefix.Addr()) {
-			s.generateTargetByPrefix(prefix, iface)
-		}
-	}
-}
-
-func (s *ServiceScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
-	dstMac, _ := arpInstance.AHMap.Get(iface.Gateway)
+func (s *ServiceScanner) GenerateTarget(ip netip.Addr, iface common.GSIface, targetCh chan interface{}, resultCh chan interface{}) {
+	dstMac, _ := arpInstance.Scanner.(*arp.ARPScanner).AHMap.Get(iface.Gateway)
 	if ip == iface.IP {
 		dstMac = iface.HWAddr
 	}
@@ -343,7 +280,7 @@ func (s *ServiceScanner) generateTarget(ip netip.Addr, iface common.GSIface) {
 				Port: port,
 				Rule: rule,
 			}
-			s.gCount += 1
+			s.GCount += 1
 		}
 	}
 }
@@ -354,32 +291,50 @@ func (s *ServiceScanner) ScanLocalNet() chan struct{} {
 	return timeoutCh
 }
 
+func (s *ServiceScanner) generateTargetByPrefix(prefix netip.Prefix, iface common.GSIface, targetCh chan interface{}, resultCh chan interface{}) {
+	for i := 0; i < 2; i++ {
+		nIp := prefix.Addr()
+		for {
+			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
+				if !nIp.IsValid() || !prefix.Contains(nIp) {
+					break
+				} else {
+					s.GenerateTarget(nIp, iface, targetCh, resultCh)
+				}
+			}
+			if i == 1 {
+				nIp = nIp.Prev()
+			} else {
+				nIp = nIp.Next()
+			}
+		}
+	}
+}
+
 func (s *ServiceScanner) generateLocalNetTarget(timeoutCh chan struct{}) {
-	defer s.waitTimeout(timeoutCh)
+	defer s.WaitTimeout(timeoutCh)
 	for _, iface := range *common.GetActiveIfaces() {
-		s.generateTargetByPrefix(iface.Mask, iface)
+		s.GenerateTargetByPrefix(iface.Mask, iface)
 	}
 }
 
 func (s *ServiceScanner) scan() {
 	for target := range s.TargetCh {
 		s.Workers.Invoke(target)
-		s.sCount += 1
+		s.SCount += 1
 	}
 }
 
 func newServiceScanner() *ServiceScanner {
 	rand.Seed(time.Now().Unix())
 	s := &ServiceScanner{
-		TargetCh:     make(chan *ServiceTarget, 10),
-		ResultCh:     make(chan *ServiceResult, 10),
-		Timeout:      6 * time.Second,
+		Scanner:      *common.NewScanner(),
 		Services:     cmap.NewWithCustomShardingFunction[netip.Addr, cmap.ConcurrentMap[layers.TCPPort, ServiceInfo]](common.Fnv32),
 		reCache:      cmap.New[regexp.Regexp](),
 		PortScanType: port.DEFAULT_PORTS,
 		Ports:        []layers.TCPPort{},
 	}
-	s.init()
+	s.Init()
 	go s.scan()
 	return s
 }

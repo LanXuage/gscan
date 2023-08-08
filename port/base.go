@@ -22,7 +22,6 @@ const (
 	DEFAULT_PORTS     uint8 = 0
 	ALL_PORTS         uint8 = 1
 	CUSTOM_PORTS      uint8 = 2
-	MAX_CHANNEL_SIZE        = 256
 )
 
 type TCPResult struct {
@@ -44,6 +43,6 @@ type RandArea [2]int
 
 var tcpInstance = newTCPScanner()
 
-func GetTCPScanner() *TCPScanner {
+func GetTCPScanner() *common.Scanner {
 	return tcpInstance
 }

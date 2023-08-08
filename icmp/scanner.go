@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"time"
 
 	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
@@ -22,10 +21,8 @@ var logger = common.GetLogger()
 
 type ICMPScanner struct {
 	common.IScanner
-	common.Scanner
 	Results ICMPResultMap // 存放本次扫描结果
 	IPList  []netip.Addr  // 存放本次所需扫描的IP
-	Timeout time.Duration // 默认超时时间
 }
 
 type ICMPTarget struct {
@@ -43,36 +40,53 @@ type ICMPScanResult struct {
 
 type ICMPResultMap *cmap.ConcurrentMap[string, bool]
 
-func NewICMPScanner() *ICMPScanner {
+func newICMPScanner() *common.Scanner {
 	_rMap := cmap.New[bool]()
 	rMap := ICMPResultMap(&_rMap)
-
 	icmpScanner := &ICMPScanner{
 		Results: rMap,
 		IPList:  []netip.Addr{},
-		Timeout: time.Second * 3,
 	}
-
-	go icmpScanner.Recv()
-	go icmpScanner.Scan()
-
-	return icmpScanner
+	return common.NewScanner(icmpScanner)
 }
 
 func (icmpScanner *ICMPScanner) Close() {
-	defer icmpScanner.Scanner.Close()
 	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
 }
 
-func (icmpScanner *ICMPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface) {
-	logger.Info("bbbbbbbbbbbbbbbbbbbb")
-	if dstMac, ok := arpInstance.AHMap.Get(iface.Gateway); ok {
-		icmpScanner.TargetCh <- &ICMPTarget{
+func (icmpScanner *ICMPScanner) Init(s *common.Scanner) {
+	go icmpScanner.goScan(s.TargetCh)
+	go icmpScanner.goRecv(s.ResultCh)
+}
+
+func (icmpScanner *ICMPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface, s *common.Scanner) {
+	if dstMac, ok := arpInstance.Scanner.(*arp.ARPScanner).AHMap.Get(iface.Gateway); ok {
+		s.TargetCh <- &ICMPTarget{
 			SrcIP:  iface.IP,
 			DstIP:  ip,
 			SrcMac: iface.HWAddr,
 			Handle: iface.Handle,
 			DstMac: dstMac,
+		}
+	}
+}
+
+func (icmpScanner *ICMPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GSIface, s *common.Scanner) {
+	for i := 0; i < 2; i++ {
+		nIp := prefix.Addr()
+		for {
+			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
+				if !nIp.IsValid() || !prefix.Contains(nIp) {
+					break
+				} else {
+					icmpScanner.GenerateTarget(nIp, iface, s)
+				}
+			}
+			if i == 1 {
+				nIp = nIp.Prev()
+			} else {
+				nIp = nIp.Next()
+			}
 		}
 	}
 }
@@ -133,17 +147,17 @@ func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
 
 }
 
-func (icmpScanner *ICMPScanner) Scan() {
-	for target := range icmpScanner.TargetCh {
+func (icmpScanner *ICMPScanner) goScan(targetCh chan interface{}) {
+	for target := range targetCh {
 		icmpScanner.SendICMP(target.(*ICMPTarget))
 	}
 }
 
 // 接收协程
-func (icmpScanner *ICMPScanner) Recv() {
+func (icmpScanner *ICMPScanner) goRecv(resultCh chan interface{}) {
 	for r := range common.GetReceiver().Register(constant.ICMPREGISTER_NAME, icmpScanner.RecvICMP) {
 		if result, ok := r.(ICMPScanResult); ok {
-			icmpScanner.ResultCh <- &result
+			resultCh <- &result
 		}
 	}
 }
@@ -182,8 +196,8 @@ func (icmpScanner *ICMPScanner) RecvICMP(packet gopacket.Packet) interface{} {
 	return nil
 }
 
-var icmpInstance = NewICMPScanner()
+var icmpInstance = newICMPScanner()
 
-func GetICMPScanner() *ICMPScanner {
+func GetICMPScanner() *common.Scanner {
 	return icmpInstance
 }

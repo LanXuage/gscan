@@ -59,7 +59,7 @@ var (
 			}
 			if len(ips) > 0 {
 				timeoutCh := arpScanner.ScanMany(ips)
-				normalPrintf(timeoutCh, arpScanner.Scanner.ResultCh)
+				normalPrintf(timeoutCh, arpScanner.ResultCh)
 			}
 			fmt.Printf("Cost: %v\n", time.Since(start))
 			return nil

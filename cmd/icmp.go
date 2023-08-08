@@ -65,9 +65,10 @@ var (
 func icmpPrintf(timeoutCh chan struct{}, resultCh chan interface{}) {
 	for {
 		select {
-		case result := <-resultCh:
-			if result.(icmp.ICMPScanResult).IsActive {
-				fmt.Printf("%s\t\tAlive\n", result.(icmp.ICMPScanResult).IP)
+		case tmp := <-resultCh:
+			result := tmp.(*icmp.ICMPScanResult)
+			if result.IsActive {
+				fmt.Printf("%s\t\tAlive\n", result.IP)
 			}
 		case <-timeoutCh:
 			return

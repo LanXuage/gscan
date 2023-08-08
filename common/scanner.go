@@ -5,20 +5,41 @@ import (
 	"time"
 )
 
+const (
+	MAX_CHANNEL_SIZE = 256
+)
+
 type IScanner interface {
-	GenerateTarget(ip netip.Addr, iface GSIface)
+	Init(s *Scanner)
+	GenerateTarget(ip netip.Addr, iface GSIface, s *Scanner)
+	GenerateTargetByPrefix(prefix netip.Prefix, iface GSIface, s *Scanner)
+	Close()
 }
 
 type Scanner struct {
-	IScanner
 	Timeout  time.Duration // 抓包超时时间
 	TargetCh chan interface{}
 	ResultCh chan interface{}
-	gCount   int64
-	sCount   int64
+	GCount   int64
+	SCount   int64
+	Scanner  IScanner
+}
+
+func NewScanner(iScanner IScanner) *Scanner {
+	s := &Scanner{
+		Timeout:  6 * time.Second,
+		TargetCh: make(chan interface{}, MAX_CHANNEL_SIZE),
+		ResultCh: make(chan interface{}, MAX_CHANNEL_SIZE),
+		GCount:   0,
+		SCount:   0,
+		Scanner:  iScanner,
+	}
+	s.Scanner.Init(s)
+	return s
 }
 
 func (s *Scanner) Close() {
+	defer s.Scanner.Close()
 	defer close(s.TargetCh)
 	defer close(s.ResultCh)
 }
@@ -27,7 +48,7 @@ func (s *Scanner) WaitTimeout(timeoutCh chan struct{}) {
 	defer close(timeoutCh)
 	for {
 		time.Sleep(time.Microsecond * 200)
-		if s.gCount == s.sCount && len(s.TargetCh) == 0 {
+		if s.GCount == s.SCount && len(s.TargetCh) == 0 {
 			break
 		}
 	}
@@ -38,7 +59,7 @@ func (s *Scanner) goScanMany(targetIPs []netip.Addr, timeoutCh chan struct{}) {
 	defer s.WaitTimeout(timeoutCh)
 	for _, targetIP := range targetIPs {
 		for _, iface := range *GetActiveIfaces() {
-			s.GenerateTarget(targetIP, iface)
+			s.Scanner.GenerateTarget(targetIP, iface, s)
 		}
 	}
 }
@@ -52,7 +73,7 @@ func (s *Scanner) ScanMany(targetIPs []netip.Addr) chan struct{} {
 func (s *Scanner) goScanPrefix(prefix netip.Prefix, timeoutCh chan struct{}) {
 	defer s.WaitTimeout(timeoutCh)
 	for _, iface := range *GetActiveIfaces() {
-		s.GenerateTargetByPrefix(prefix, iface)
+		s.Scanner.GenerateTargetByPrefix(prefix, iface, s)
 	}
 }
 
@@ -62,26 +83,15 @@ func (s *Scanner) ScanPrefix(prefix netip.Prefix) chan struct{} {
 	return timeoutCh
 }
 
-func (s *Scanner) GenerateTargetByPrefix(prefix netip.Prefix, iface GSIface) {
-	for i := 0; i < 2; i++ {
-		nIp := prefix.Addr()
-		for {
-			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
-				if !nIp.IsValid() || !prefix.Contains(nIp) {
-					break
-				} else {
-					s.GenerateTarget(nIp, iface)
-				}
-			}
-			if i == 1 {
-				nIp = nIp.Prev()
-			} else {
-				nIp = nIp.Next()
-			}
-		}
-	}
+func (s *Scanner) ScanLocalNet() chan struct{} {
+	timeoutCh := make(chan struct{})
+	go s.goScanLocalNet(timeoutCh)
+	return timeoutCh
 }
 
-func (s *Scanner) GenerateTarget(ip netip.Addr, iface GSIface) {
-	logger.Panic("GenerateTarget need to be implemented. ")
+func (s *Scanner) goScanLocalNet(timeoutCh chan struct{}) {
+	defer s.WaitTimeout(timeoutCh)
+	for _, iface := range *GetActiveIfaces() {
+		s.Scanner.GenerateTargetByPrefix(iface.Mask, iface, s)
+	}
 }
