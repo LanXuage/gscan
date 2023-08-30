@@ -18,13 +18,10 @@ var (
 		Short: "ICMP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			icmpScanner := icmp.GetICMPScanner()
-			// defer icmpScanner.Close()
 			logger := common.GetLogger()
 			start := time.Now()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			icmpScanner.Timeout = time.Millisecond * time.Duration(timeout)
-
 			if hosts, err := cmd.Flags().GetStringArray("hosts"); err == nil {
 				if len(hosts) == 0 {
 					cmd.Help()
@@ -40,7 +37,7 @@ var (
 						logger.Debug("icmp", zap.Any("ip", ip))
 						ipList := []netip.Addr{}
 						ipList = append(ipList, ip)
-						timeoutCh := icmpScanner.ScanMany(ipList)
+						timeoutCh := icmpScanner.Scan(ipList)
 						icmpPrintf(timeoutCh, icmpScanner.ResultCh)
 					}
 					if prefix, err := netip.ParsePrefix(host); err == nil {

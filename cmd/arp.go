@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/scanner"
 
-	"github.com/LanXuage/gscan/arp"
+	"github.com/LanXuage/gscan/core/arp"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,20 +20,18 @@ var (
 		Short: "ARP Scanner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arpScanner := arp.GetARPScanner()
-			// defer arpScanner.Close()
 			start := time.Now()
 			fmt.Printf("%-39s %-17s %-73s\n", "IP", "MAC", "VENDOR")
 			logger := common.GetLogger()
 			timeout, _ := cmd.Flags().GetInt64("timeout")
 			logger.Debug("runE", zap.Int64("timeout", timeout))
-			arpScanner.Timeout = time.Millisecond * time.Duration(timeout)
 			hosts, _ := cmd.Flags().GetStringArray("host")
 			logger.Debug("runE", zap.Any("host", hosts))
 			if len(hosts) == 0 {
 				all, _ := cmd.Flags().GetBool("all")
 				if all {
-					timeoutCh := arpScanner.ScanLocalNet()
-					normalPrintf(timeoutCh, arpScanner.ResultCh)
+					task := arpScanner.ScanLocalNet()
+					normalPrintf(task, timeout)
 				} else {
 					cmd.Help()
 				}
@@ -49,17 +48,16 @@ var (
 						}
 					} else {
 						logger.Debug("runE", zap.Any("prefix", prefix))
-						timeoutCh := arpScanner.ScanPrefix(prefix)
-						normalPrintf(timeoutCh, arpScanner.ResultCh)
+						task := arpScanner.ScanPrefix(prefix)
+						normalPrintf(task, timeout)
 					}
 				} else {
-					timeoutCh := arpScanner.ScanMany([]netip.Addr{ip})
-					normalPrintf(timeoutCh, arpScanner.ResultCh)
+					ips = append(ips, ip)
 				}
 			}
 			if len(ips) > 0 {
-				timeoutCh := arpScanner.ScanMany(ips)
-				normalPrintf(timeoutCh, arpScanner.ResultCh)
+				task := arpScanner.Scan(ips)
+				normalPrintf(task, timeout)
 			}
 			fmt.Printf("Cost: %v\n", time.Since(start))
 			return nil
@@ -67,15 +65,10 @@ var (
 	}
 )
 
-func normalPrintf(timeoutCh chan struct{}, resultCh chan interface{}) {
-	for {
-		select {
-		case result := <-resultCh:
-			arpResult := result.(*arp.ARPScanResult)
-			fmt.Printf("%-39s %-17v %-73s\n", arpResult.IP, arpResult.Mac, arpResult.Vendor)
-		case <-timeoutCh:
-			return
-		}
+func normalPrintf(task scanner.ScanTask, timeout int64) {
+	for result := range task.GetResults(time.Millisecond * time.Duration(timeout)) {
+		arpResult := result.(*arp.ARPScanResult)
+		fmt.Printf("%-39s %-17v %-73s\n", arpResult.IP, arpResult.Mac, arpResult.Vendor)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -76,24 +77,6 @@ func IPList2NetIPList(ipList []string) []netip.Addr {
 	return ret
 }
 
-// Deprecated: Use common.IsSameLAN instead.
-func CheckIPisIPNet(ip net.IP, gateway net.IP, mask uint32) bool {
-
-	ipArray := ip.To4()
-	gatewayArray := gateway.To4()
-
-	l := len(ipArray)
-	if l != len(gatewayArray) {
-		return false
-	}
-	for i := 0; i < l; i++ {
-		if ipArray[i]&byte((mask>>(24-i*8))&0xff) != gatewayArray[i]&byte((mask>>(24-i*8))&0xff) {
-			return false
-		}
-	}
-	return true
-}
-
 func Exec(command string) []byte {
 	cmd := exec.Command("sh", "-c", command)
 	out, err := cmd.CombinedOutput()
@@ -117,4 +100,17 @@ func Runes2Bytes(r []rune) []byte {
 		b = append(b, byte(i))
 	}
 	return b
+}
+
+func WaitTimeout(timeoutCh chan struct{}, timeout time.Duration) {
+	defer close(timeoutCh)
+	time.Sleep(timeout)
+}
+
+func GetDefaultPorts() *[]layers.TCPPort {
+	return &[]layers.TCPPort{20, 21, 22, 23, 25, 53, 80, 110, 135, 137, 138, 139, 161, 443, 445, 901, 991, 1025, 1026, 1029, 1080, 1099, 1433, 1521, 1526, 1723, 1863, 1900, 2179, 2483, 2484, 3306, 3389, 5000, 5040, 5091, 5357, 5432, 5800, 5900, 6379, 7001, 7680, 8000, 8008, 8009, 8080, 8090, 8443, 8888, 9000, 9001, 9200, 10808, 10809, 27017}
+}
+
+func Close() {
+	defer GEOIP2_DB.Close()
 }

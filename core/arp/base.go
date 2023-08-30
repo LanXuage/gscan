@@ -5,10 +5,9 @@ import (
 	"net/netip"
 
 	"github.com/LanXuage/gscan/common"
+	"github.com/LanXuage/gscan/scanner"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
 const (
@@ -19,7 +18,6 @@ var ETH_BROADCAST = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 var ARP_BROADCAST = net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 var logger = common.GetLogger()
-var receiver = common.GetReceiver()
 
 type ARPScanResult struct {
 	IP     netip.Addr       `json:"ip"`     // 结果IP
@@ -27,32 +25,33 @@ type ARPScanResult struct {
 	Vendor string           `json:"vendor"` // 结果物理地址厂商
 }
 
-type ARPScanResults struct {
-	Results []*ARPScanResult
-}
-
-type Target struct {
+type ARPScanTarget struct {
 	SrcMac net.HardwareAddr // 发包的源物理地址
 	SrcIP  netip.Addr       // 发包的源协议IP
 	DstIP  netip.Addr       // 目的IP
 	Handle *pcap.Handle     // 发包的具体句柄地址
 }
 
-func newARPScanner() *common.Scanner {
-	a := &ARPScanner{
-		Opts: gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
-		},
-		OMap:  common.GetOui(),
-		AHMap: cmap.NewWithCustomShardingFunction[netip.Addr, net.HardwareAddr](common.Fnv32),
-		Ifas:  common.GetActiveIfaces(),
-	}
-	return common.NewScanner(a)
+func newARPScanner() scanner.Scanner {
+	return scanner.NewScanner(NewARPScannerCore())
 }
 
-var instance = newARPScanner()
+var instance scanner.Scanner
 
-func GetARPScanner() *common.Scanner {
+func init() {
+	instance = newARPScanner()
+}
+
+func GetARPScanner() scanner.Scanner {
 	return instance
+}
+
+func GetMac(ip netip.Addr) (*net.HardwareAddr, bool) {
+	for result := range instance.Scan([]netip.Addr{ip}).GetResults(10) {
+		tmp := result.(*ARPScanResult)
+		if tmp.IP == ip {
+			return &tmp.Mac, true
+		}
+	}
+	return nil, false
 }

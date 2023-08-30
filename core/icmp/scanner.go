@@ -2,84 +2,49 @@ package icmp
 
 import (
 	"log"
-	"net"
 	"net/netip"
 
-	"github.com/LanXuage/gscan/arp"
 	"github.com/LanXuage/gscan/common"
 	"github.com/LanXuage/gscan/common/constant"
+	"github.com/LanXuage/gscan/core/arp"
+	"github.com/LanXuage/gscan/scanner"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 )
 
-var arpInstance = arp.GetARPScanner()
-var logger = common.GetLogger()
-
-type ICMPScanner struct {
-	common.IScanner
-	Results ICMPResultMap // 存放本次扫描结果
-	IPList  []netip.Addr  // 存放本次所需扫描的IP
+type ICMPScannerCore struct {
+	opts      gopacket.SerializeOptions // 包序列化选项
+	scanTasks mapset.Set
 }
 
-type ICMPTarget struct {
-	SrcMac net.HardwareAddr // 发包的源物理地址
-	SrcIP  netip.Addr       // 发包的源协议IP
-	DstIP  netip.Addr       // 目的IP
-	DstMac net.HardwareAddr // 目的Mac
-	Handle *pcap.Handle     // 发包的具体句柄地址
+func NewICMPScannerCore() scanner.ScannerCore {
+
 }
 
-type ICMPScanResult struct {
-	arp.ARPScanResult
-	IsActive bool // 是否存活
-}
-
-type ICMPResultMap *cmap.ConcurrentMap[string, bool]
-
-func newICMPScanner() *common.Scanner {
-	_rMap := cmap.New[bool]()
-	rMap := ICMPResultMap(&_rMap)
-	icmpScanner := &ICMPScanner{
-		Results: rMap,
-		IPList:  []netip.Addr{},
-	}
-	return common.NewScanner(icmpScanner)
-}
-
-func (icmpScanner *ICMPScanner) Close() {
-	common.GetReceiver().Unregister(constant.ICMPREGISTER_NAME)
-}
-
-func (icmpScanner *ICMPScanner) Init(s *common.Scanner) {
-	go icmpScanner.goScan(s.TargetCh)
-	go icmpScanner.goRecv(s.ResultCh)
-}
-
-func (icmpScanner *ICMPScanner) GenerateTarget(ip netip.Addr, iface common.GSIface, s *common.Scanner) {
-	if dstMac, ok := arpInstance.Scanner.(*arp.ARPScanner).AHMap.Get(iface.Gateway); ok {
-		s.TargetCh <- &ICMPTarget{
+func (icmp *ICMPScannerCore) GenerateTarget(iface common.GSIface, ip netip.Addr, task scanner.ScanTask) {
+	if dstMac, ok := arp.GetMac(iface.Gateway); ok {
+		task.PutTarget(&ICMPTarget{
 			SrcIP:  iface.IP,
 			DstIP:  ip,
 			SrcMac: iface.HWAddr,
 			Handle: iface.Handle,
-			DstMac: dstMac,
-		}
+			DstMac: *dstMac,
+		})
 	}
 }
 
-func (icmpScanner *ICMPScanner) GenerateTargetByPrefix(prefix netip.Prefix, iface common.GSIface, s *common.Scanner) {
+func (icmp *ICMPScannerCore) GenerateTargetByPrefix(iface common.GSIface, prefix netip.Prefix, task ScanTask) {
 	for i := 0; i < 2; i++ {
-		nIp := prefix.Addr()
+		nextAddr := prefix.Addr()
 		for {
 			if (nIp.Is4() && nIp.AsSlice()[3] != 0 && nIp.AsSlice()[3] != 255) || (nIp.Is6() && nIp.AsSlice()[15] != 0 && (nIp.AsSlice()[14] != 255 || nIp.AsSlice()[15] != 255)) {
 				if !nIp.IsValid() || !prefix.Contains(nIp) {
 					break
 				} else {
-					icmpScanner.GenerateTarget(nIp, iface, s)
+					icmp.GenerateTarget(iface, nextAddr, task)
 				}
 			}
 			if i == 1 {
@@ -92,7 +57,7 @@ func (icmpScanner *ICMPScanner) GenerateTargetByPrefix(prefix netip.Prefix, ifac
 }
 
 // ICMP发包
-func (icmpScanner *ICMPScanner) SendICMP(target *ICMPTarget) {
+func (icmpScanner *ICMPScanner) Send(target interface{}) {
 	payload := []byte("1") // 特征
 	buffer := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
