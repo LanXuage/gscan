@@ -61,15 +61,16 @@ var (
 					}
 				}
 			}
-			tcpScanner.UseFullTCP, _ = cmd.Flags().GetBool("full")
+			tcpScanner.Scanner.(*port.TCPScanner).UseFullTCP, _ = cmd.Flags().GetBool("full")
 			ports, _ := cmd.Flags().GetStringArray("port")
+			iScanner := tcpScanner.Scanner.(*port.TCPScanner)
 			if len(ports) != 0 {
-				tcpScanner.PortScanType = port.CUSTOM_PORTS
+				iScanner.PortScanType = port.CUSTOM_PORTS
 				for _, port := range ports {
 					tmp, _ := ParsePort(port)
-					tcpScanner.Ports = append(tcpScanner.Ports, tmp...)
+					iScanner.Ports = append(iScanner.Ports, tmp...)
 				}
-				logger.Debug("runE", zap.Any("ports", tcpScanner.Ports))
+				logger.Debug("runE", zap.Any("ports", iScanner.Ports))
 			}
 			ips := []netip.Addr{}
 			for _, host := range hosts {
@@ -98,19 +99,21 @@ var (
 	}
 )
 
-func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan *port.TCPResult) {
+func normalPrintfTCP(timeoutCh chan struct{}, resultCh chan interface{}) {
+	arpScanner := arp.GetARPScanner()
 	for {
 		select {
-		case result := <-resultCh:
+		case tmp := <-resultCh:
+			result := tmp.(*port.TCPResult)
 			fmt.Printf("%-39s ", result.IP)
 			if withARP {
 				var vendor any = ""
-				h, ok := arp.GetARPScanner().AHMap.Get(result.IP)
+				h, ok := arpScanner.Scanner.(*arp.ARPScanner).AHMap.Get(result.IP)
 				if ok {
 					prefix1, prefix2 := common.GetOuiPrefix(h)
-					vendor, ok = arp.GetARPScanner().OMap.Load(prefix2)
+					vendor, ok = arpScanner.Scanner.(*arp.ARPScanner).OMap.Load(prefix2)
 					if !ok {
-						vendor, _ = arp.GetARPScanner().OMap.Load(prefix1)
+						vendor, _ = arpScanner.Scanner.(*arp.ARPScanner).OMap.Load(prefix1)
 					}
 				} else {
 					h = net.HardwareAddr{}

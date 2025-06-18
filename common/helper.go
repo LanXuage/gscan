@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -46,34 +47,6 @@ func ToJSON(data interface{}) string {
 	return out.String()
 }
 
-// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
-func IP2Uint32(ip net.IP) uint32 {
-	var sum uint32
-	if len(ip) < 4 {
-		logger.Error("IP2Uint32", zap.Any("ip", ip), zap.Int("len", len(ip)))
-		logger.Panic("invailed IPv4")
-	}
-	sum += uint32(ip[0]) << 24
-	sum += uint32(ip[1]) << 16
-	sum += uint32(ip[2]) << 8
-	return sum + uint32(ip[3])
-}
-
-// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
-func IPMask2Uint32(mask net.IPMask) uint32 {
-	return IP2Uint32(net.IP(mask))
-}
-
-// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
-func Uint322IP(ipUint32 uint32) net.IP {
-	return net.IPv4(byte((ipUint32>>24)&0xff), byte((ipUint32>>16)&0xff), byte((ipUint32>>8)&0xff), byte(ipUint32&0xff))
-}
-
-// Deprecated: Due to its non applicability to IPv6, it will be phased out, Please use the relevant functions of netip to replace.
-func IsSameLAN(ip net.IP, otherIp net.IP, mask uint32) bool {
-	return IP2Uint32(ip)&mask == IP2Uint32(otherIp)&mask
-}
-
 func PacketToIPv4(packet gopacket.Packet) net.IP {
 	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
@@ -104,24 +77,6 @@ func IPList2NetIPList(ipList []string) []netip.Addr {
 	return ret
 }
 
-// Deprecated: Use common.IsSameLAN instead.
-func CheckIPisIPNet(ip net.IP, gateway net.IP, mask uint32) bool {
-
-	ipArray := ip.To4()
-	gatewayArray := gateway.To4()
-
-	l := len(ipArray)
-	if l != len(gatewayArray) {
-		return false
-	}
-	for i := 0; i < l; i++ {
-		if ipArray[i]&byte((mask>>(24-i*8))&0xff) != gatewayArray[i]&byte((mask>>(24-i*8))&0xff) {
-			return false
-		}
-	}
-	return true
-}
-
 func Exec(command string) []byte {
 	cmd := exec.Command("sh", "-c", command)
 	out, err := cmd.CombinedOutput()
@@ -145,4 +100,17 @@ func Runes2Bytes(r []rune) []byte {
 		b = append(b, byte(i))
 	}
 	return b
+}
+
+func WaitTimeout(timeoutCh chan struct{}, timeout time.Duration) {
+	defer close(timeoutCh)
+	time.Sleep(timeout)
+}
+
+func GetDefaultPorts() *[]layers.TCPPort {
+	return &[]layers.TCPPort{20, 21, 22, 23, 25, 53, 80, 110, 135, 137, 138, 139, 161, 443, 445, 901, 991, 1025, 1026, 1029, 1080, 1099, 1433, 1521, 1526, 1723, 1863, 1900, 2179, 2483, 2484, 3306, 3389, 5000, 5040, 5091, 5357, 5432, 5800, 5900, 6379, 7001, 7680, 8000, 8008, 8009, 8080, 8090, 8443, 8888, 9000, 9001, 9200, 10808, 10809, 27017}
+}
+
+func Close() {
+	defer GEOIP2_DB.Close()
 }
